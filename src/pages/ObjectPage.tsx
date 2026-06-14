@@ -1,33 +1,59 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HiArrowLeft, HiVolumeUp, HiVolumeOff, HiPaperAirplane } from 'react-icons/hi';
-import { MdOutlinePlace } from 'react-icons/md';
-import { fetchObject, fetchByNfc, fetchByQr, type TourObject } from '../services/objectService';
-import { askAI } from '../services/aiService';
+import {
+  HiArrowLeft, HiLocationMarker, HiVolumeUp, HiVolumeOff,
+  HiLightBulb, HiChevronRight,
+} from 'react-icons/hi';
+import { MdPets, MdPark, MdAccountBalance, MdOutlinePlace } from 'react-icons/md';
+import { GiBirdCage } from 'react-icons/gi';
+import LanguageSelector from '../components/common/LanguageSelector';
+import { fetchObject, fetchByNfc, fetchByQr, fetchNearby, type TourObject } from '../services/objectService';
+
+const TYPE_ICON: Record<string, JSX.Element> = {
+  animal:   <MdPets size={16} />,
+  bird:     <GiBirdCage size={16} />,
+  tree:     <MdPark size={16} />,
+  landmark: <MdAccountBalance size={16} />,
+};
+
+const TYPE_LABEL: Record<string, Record<string, string>> = {
+  animal:   { en: 'Animal',   fr: 'Animal',   rw: 'Inyamaswa' },
+  bird:     { en: 'Bird',     fr: 'Oiseau',   rw: 'Inyoni' },
+  tree:     { en: 'Tree',     fr: 'Arbre',    rw: 'Igiti' },
+  landmark: { en: 'Landmark', fr: 'Monument', rw: 'Akaranga' },
+};
+
+const FUN_FACTS: Record<string, string> = {
+  animal:   'Animals in this park are protected under national conservation law.',
+  bird:     'Birds play a vital role in seed dispersal and ecosystem balance.',
+  tree:     'Trees absorb CO₂ and produce oxygen for hundreds of living organisms.',
+  landmark: 'Cultural landmarks preserve the history and identity of a community.',
+};
 
 export default function ObjectPage() {
   const { id, nfcId, qrCode } = useParams<{ id?: string; nfcId?: string; qrCode?: string }>();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
-  const [object, setObject]     = useState<TourObject | null>(null);
-  const [error, setError]       = useState<string | null>(null);
-  const [playing, setPlaying]   = useState(false);
-  const [question, setQuestion] = useState('');
-  const [answer, setAnswer]     = useState('');
-  const [asking, setAsking]     = useState(false);
+  const [object,  setObject]  = useState<TourObject | null>(null);
+  const [nearby,  setNearby]  = useState<TourObject[]>([]);
+  const [error,   setError]   = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const obj = id    ? await fetchObject(id)
-                 : nfcId  ? await fetchByNfc(nfcId)
-                 : qrCode ? await fetchByQr(qrCode)
-                 : null;
+        const obj = id      ? await fetchObject(id)
+                  : nfcId   ? await fetchByNfc(nfcId)
+                  : qrCode  ? await fetchByQr(qrCode)
+                  : null;
         if (!obj) throw new Error();
         setObject(obj);
+        fetchNearby(obj.latitude, obj.longitude, 300)
+          .then(list => setNearby(list.filter(n => n.id !== obj.id).slice(0, 4)))
+          .catch(() => null);
       } catch { setError(t('notFound')); }
     })();
   }, [id, nfcId, qrCode]);
@@ -38,69 +64,81 @@ export default function ObjectPage() {
     setPlaying(p => !p);
   };
 
-  const handleAsk = async () => {
-    if (!question.trim() || !object) return;
-    setAsking(true);
-    setAnswer('');
-    try {
-      const res = await askAI(question, String(object.id));
-      setAnswer(res);
-    } catch { setAnswer('Sorry, could not get an answer. Please try again.'); }
-    setAsking(false);
-  };
+  const lang = ['en', 'fr', 'rw'].includes(i18n.language) ? i18n.language : 'en';
 
   if (error) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-6 text-center gap-4">
-      <MdOutlinePlace size={40} className="text-slate-300" />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-6 text-center gap-4">
+      <MdOutlinePlace size={40} className="text-slate-200" />
       <p className="text-slate-500 text-sm">{error}</p>
-      <button onClick={() => navigate('/map')} className="text-blue-500 text-sm underline">{t('backToMap')}</button>
+      <button onClick={() => navigate('/')} className="text-blue-500 text-sm underline">{t('backToHome')}</button>
     </div>
   );
 
   if (!object) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+    <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
+  const typeLabel = TYPE_LABEL[object.type]?.[lang] ?? object.type;
+  const funFact   = FUN_FACTS[object.type] ?? FUN_FACTS.landmark;
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-xl mx-auto px-4 py-6 space-y-4">
+    <div className="min-h-screen bg-white max-w-lg mx-auto flex flex-col">
 
-        {/* Back button */}
+      {/* Hero image */}
+      <div className="relative flex-shrink-0">
+        {object.imageUrl
+          ? <img src={object.imageUrl} alt={object.name} className="w-full h-72 object-cover" />
+          : <div className="w-full h-72 bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center">
+              <MdOutlinePlace size={56} className="text-slate-200" />
+            </div>
+        }
         <button onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition">
-          <HiArrowLeft size={16} /> Back
+          className="absolute top-4 left-4 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center">
+          <HiArrowLeft size={18} />
         </button>
+        <div className="absolute top-4 right-4">
+          <LanguageSelector />
+        </div>
+        <span className="absolute bottom-4 left-4 flex items-center gap-1.5 text-xs font-semibold bg-black/40 backdrop-blur-sm text-white px-3 py-1.5 rounded-full capitalize">
+          {TYPE_ICON[object.type] ?? <MdOutlinePlace size={14} />}
+          {typeLabel}
+        </span>
+      </div>
 
-        {/* Image card */}
-        <div className="w-full rounded-3xl overflow-hidden shadow-sm bg-white">
-          {object.imageUrl
-            ? <img src={object.imageUrl} alt={object.name} className="w-full h-64 object-cover" />
-            : <div className="w-full h-64 bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center">
-                <MdOutlinePlace size={56} className="text-slate-200" />
-              </div>
-          }
+      {/* Content */}
+      <div className="flex-1 px-5 py-6 space-y-6">
+
+        {/* Title */}
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 leading-tight">{object.name}</h1>
+          <p className="flex items-center gap-1 text-xs text-slate-400 mt-1.5">
+            <HiLocationMarker size={13} />
+            {object.latitude.toFixed(4)}, {object.longitude.toFixed(4)}
+          </p>
         </div>
 
-        {/* Main info card */}
-        <div className="bg-white rounded-3xl shadow-sm px-6 py-5 space-y-3">
-          <span className="text-xs font-semibold uppercase tracking-widest text-blue-400">{object.type}</span>
-          <h1 className="text-2xl font-bold text-slate-800 leading-snug">{object.name}</h1>
-          <p className="text-slate-500 text-sm leading-relaxed">{object.description}</p>
+        {/* Type pill */}
+        <div className="flex flex-wrap gap-2">
+          <span className="flex items-center gap-1.5 text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full font-medium">
+            {TYPE_ICON[object.type]} {typeLabel}
+          </span>
         </div>
 
-        {/* Narration card */}
+        {/* Description */}
+        <p className="text-slate-600 text-sm leading-relaxed">{object.description}</p>
+
+        {/* Narration button */}
         {object.audioUrl && (
-          <div className="bg-white rounded-3xl shadow-sm px-6 py-5">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Audio Guide</p>
+          <div>
             <button onClick={toggleAudio}
-              className={`flex items-center gap-4 w-full px-5 py-4 rounded-2xl border transition active:scale-95 ${
+              className={`flex items-center gap-3 w-full px-5 py-4 rounded-2xl border transition active:scale-95 ${
                 playing
-                  ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-100'
-                  : 'bg-slate-50 border-slate-200 text-blue-500 hover:bg-blue-50'
+                  ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-200'
+                  : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50'
               }`}>
-              <div className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ${playing ? 'bg-white/20' : 'bg-blue-100'}`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${playing ? 'bg-white/20' : 'bg-blue-50'}`}>
                 {playing ? <HiVolumeUp size={20} /> : <HiVolumeOff size={20} />}
               </div>
               <div className="text-left">
@@ -114,36 +152,38 @@ export default function ObjectPage() {
           </div>
         )}
 
-        {/* Ask More card */}
-        <div className="bg-white rounded-3xl shadow-sm px-6 py-5 space-y-4">
+        {/* Nearby attractions */}
+        {nearby.length > 0 && (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Ask More</p>
-            <p className="text-sm text-slate-500 mt-1">Have a question about <span className="font-medium text-slate-700">{object.name}</span>? Ask our AI guide.</p>
-          </div>
-          <div className="flex gap-2">
-            <input
-              className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 bg-slate-50"
-              placeholder="e.g. How old is this tree?"
-              value={question}
-              onChange={e => setQuestion(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAsk()}
-            />
-            <button onClick={handleAsk} disabled={asking || !question.trim()}
-              className="w-10 h-10 rounded-xl bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-white flex items-center justify-center flex-shrink-0 transition">
-              <HiPaperAirplane size={15} className="rotate-90" />
-            </button>
-          </div>
-          {asking && (
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-              Thinking…
+            <h2 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+              <HiLocationMarker size={15} className="text-blue-400" />
+              {t('nearbyAttractions')}
+            </h2>
+            <div className="space-y-2">
+              {nearby.map(n => (
+                <button key={n.id} onClick={() => navigate(`/object/${n.id}`)}
+                  className="w-full flex items-center gap-3 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-100 rounded-2xl px-4 py-3 transition text-left">
+                  <div className="w-9 h-9 rounded-xl bg-white border border-slate-100 flex items-center justify-center flex-shrink-0 text-blue-400">
+                    {TYPE_ICON[n.type] ?? <MdOutlinePlace size={16} />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-700 truncate">{n.name}</p>
+                    <p className="text-xs text-slate-400 capitalize">{TYPE_LABEL[n.type]?.[lang] ?? n.type}</p>
+                  </div>
+                  <HiChevronRight size={16} className="text-slate-300 flex-shrink-0" />
+                </button>
+              ))}
             </div>
-          )}
-          {answer && (
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm text-slate-600 leading-relaxed">
-              {answer}
-            </div>
-          )}
+          </div>
+        )}
+
+        {/* Fun fact */}
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-4 flex gap-3">
+          <HiLightBulb size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-bold text-blue-600 mb-1">{t('funFacts')}</p>
+            <p className="text-sm text-slate-600 leading-relaxed">{funFact}</p>
+          </div>
         </div>
 
       </div>

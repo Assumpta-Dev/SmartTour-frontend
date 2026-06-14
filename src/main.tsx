@@ -5,10 +5,19 @@ import App from './App';
 import './styles/index.css';
 import './i18n';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+const root = document.getElementById('root')!;
+
+ReactDOM.createRoot(root).render(
   <React.StrictMode>
     <BrowserRouter>
       <App />
     </BrowserRouter>
   </React.StrictMode>
 );
+
+// Hide the HTML loader once React has painted
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    (window as any).__hideLoader?.();
+  });
+});

@@ -9,5 +9,13 @@
     "paths": { "@/*": ["./src/*"] },
     "skipLibCheck": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/pages/HomePage.tsx",
+    "src/pages/ItemDetailPage.tsx",
+    "src/pages/LocationPage.tsx",
+    "src/pages/HomePage.js",
+    "src/pages/ItemDetailPage.js",
+    "src/pages/LocationPage.js"
+  ]
 }

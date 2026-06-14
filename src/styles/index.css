@@ -3,3 +3,29 @@
 @tailwind utilities;
 
 html, body, #root { height: 100%; margin: 0; padding: 0; }
+
+/* Swiper hero card — full height, slides move right to left */
+.hero-swiper {
+  height: 100%;
+  overflow: hidden;
+}
+.hero-swiper .swiper-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+}
+.hero-swiper .swiper-slide {
+  height: 100%;
+  width: 100% !important;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Hide scrollbar but keep scroll */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Thin scrollbar for location grid */
+.custom-scroll::-webkit-scrollbar { width: 4px; }
+.custom-scroll::-webkit-scrollbar-track { background: transparent; }
+.custom-scroll::-webkit-scrollbar-thumb { background: #bfdbfe; border-radius: 2px; }

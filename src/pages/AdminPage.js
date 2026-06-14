@@ -1,42 +1,61 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { QRCodeCanvas } from 'qrcode.react';
-import { HiOutlineLockClosed, HiOutlineLogout, HiOutlinePencil, HiOutlineTrash, HiOutlinePlus, HiChevronLeft, HiChevronRight, HiDownload, HiX, HiPlay, HiPause, } from 'react-icons/hi';
-import { MdNfc, MdQrCode } from 'react-icons/md';
-import { adminLogin, fetchObjects, createObject, updateObject, deleteObject, } from '../services/objectService';
-const PAGE_SIZE = 5;
-const BASE_URL = window.location.origin;
-const EMPTY = { name: '', type: '', description: '', nfcId: '', qrCode: '', audioUrl: '' };
-const qrUrl = (o) => o.qrCode ? `${BASE_URL}/qr/${o.qrCode}` : `${BASE_URL}/object/${o.id}`;
-const nfcUrl = (o) => o.nfcId ? `${BASE_URL}/nfc/${o.nfcId}` : null;
-/* ── Mini audio player used inside preview modal ── */
-function PreviewAudio({ src }) {
-    const ref = useRef(null);
-    const [playing, setPlaying] = useState(false);
-    const toggle = () => {
-        if (!ref.current)
-            return;
-        playing ? ref.current.pause() : ref.current.play();
-        setPlaying(p => !p);
-    };
-    return (_jsxs("div", { className: "flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 w-full", children: [_jsx("button", { onClick: toggle, className: "w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0 hover:bg-blue-400 transition", children: playing ? _jsx(HiPause, { size: 18 }) : _jsx(HiPlay, { size: 18, className: "ml-0.5" }) }), _jsx("span", { className: "text-sm text-slate-600", children: playing ? 'Playing…' : 'Play narration' }), _jsx("audio", { ref: ref, src: src, onEnded: () => setPlaying(false) })] }));
-}
+import { useState, useEffect } from 'react';
+import { HiOutlineLockClosed, HiOutlineUser, HiEye, HiEyeOff, HiOutlineLogout, HiOutlinePencil, HiOutlineTrash, HiOutlinePlus, HiChevronLeft, HiChevronRight, HiOutlinePhotograph, HiOutlineMusicNote, HiOutlineFilm, HiOutlineLocationMarker, HiCheckCircle, HiXCircle, } from 'react-icons/hi';
+import { MdNfc, MdQrCode, MdPets, MdPark, MdAccountBalance, MdOutlinePlace } from 'react-icons/md';
+import { GiBirdCage } from 'react-icons/gi';
+import { TbLeaf, TbMapPin } from 'react-icons/tb';
+import { adminLogin, fetchObjects, createObject, updateObject, deleteObject } from '../services/objectService';
+import { fetchLocations, fetchCategories, fetchItems, adminCreateLocation, adminUpdateLocation, adminDeleteLocation, adminCreateCategory, adminUpdateCategory, adminDeleteCategory, adminCreateItem, adminUpdateItem, adminDeleteItem, } from '../services/tourismService';
+import { Footer } from './HomePage';
+const TAB_CONFIG = [
+    { key: 'locations', label: 'Destinations', icon: _jsx(TbMapPin, { size: 16 }) },
+    { key: 'categories', label: 'Categories', icon: _jsx(MdPark, { size: 16 }) },
+    { key: 'items', label: 'Features', icon: _jsx(MdOutlinePlace, { size: 16 }) },
+    { key: 'objects', label: 'NFC Objects', icon: _jsx(MdNfc, { size: 16 }) },
+];
+const TYPE_ICON = {
+    animal: _jsx(MdPets, { size: 18, className: "text-blue-500" }),
+    bird: _jsx(GiBirdCage, { size: 18, className: "text-blue-500" }),
+    tree: _jsx(TbLeaf, { size: 18, className: "text-blue-500" }),
+    landmark: _jsx(MdAccountBalance, { size: 18, className: "text-blue-500" }),
+};
+const inp = 'w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 bg-white text-slate-800 placeholder:text-slate-400';
+const label = 'text-xs font-semibold text-slate-500 mb-1 block';
 export default function AdminPage() {
     const [token, setToken] = useState(() => sessionStorage.getItem('admin_token') ?? '');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [showPw, setShowPw] = useState(false);
     const [loginErr, setLoginErr] = useState('');
-    const [objects, setObjects] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [form, setForm] = useState(EMPTY);
-    const [editing, setEditing] = useState(null);
-    const [formKey, setFormKey] = useState(0);
+    const [tab, setTab] = useState('locations');
     const [msg, setMsg] = useState('');
-    const [page, setPage] = useState(1);
-    const [preview, setPreview] = useState(null);
-    const load = useCallback(() => fetchObjects(1, 500).then(r => setObjects(r.data)).catch(() => null), []);
-    useEffect(() => { if (token)
-        load(); }, [token, load]);
+    const [loading, setLoading] = useState(false);
+    const [objects, setObjects] = useState([]);
+    const [locations, setLocations] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [items, setItems] = useState([]);
+    const [locForm, setLocForm] = useState({});
+    const [catForm, setCatForm] = useState({});
+    const [itemForm, setItemForm] = useState({});
+    const [objForm, setObjForm] = useState({});
+    const [editingLoc, setEditingLoc] = useState(null);
+    const [editingCat, setEditingCat] = useState(null);
+    const [editingItem, setEditingItem] = useState(null);
+    const [editingObj, setEditingObj] = useState(null);
+    // pagination
+    const [locPage, setLocPage] = useState(1);
+    const [itemPage, setItemPage] = useState(1);
+    const [objPage, setObjPage] = useState(1);
+    const PAGE = 6;
+    const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000); };
+    useEffect(() => {
+        if (!token)
+            return;
+        fetchLocations().then(setLocations).catch(() => null);
+        fetchCategories().then(setCategories).catch(() => null);
+        fetchItems({ limit: 200 }).then(r => setItems(r.data)).catch(() => null);
+        fetchObjects(1, 200).then(r => setObjects(r.data)).catch(() => null);
+    }, [token]);
     const handleLogin = async () => {
         setLoginErr('');
         try {
@@ -45,82 +64,125 @@ export default function AdminPage() {
             setToken(t);
         }
         catch (e) {
-            const msg = e?.response?.data?.error ?? e?.response?.data?.message ?? e?.message ?? '';
-            if (!e?.response) {
-                setLoginErr('Cannot reach server. Make sure the backend is running.');
-            }
-            else {
-                setLoginErr(msg || `Error ${e.response.status}`);
-            }
+            const m = e?.response?.data?.error ?? e?.response?.data?.message ?? e?.message ?? '';
+            setLoginErr(!e?.response ? 'Cannot reach server. Is the backend running?' : m || 'Invalid credentials.');
         }
     };
     const handleLogout = () => { sessionStorage.removeItem('admin_token'); setToken(''); };
-    const handleEdit = (obj) => {
-        setPreview(null);
-        setEditing(obj.id);
-        setForm({ name: obj.name, type: obj.type, description: obj.description,
-            latitude: obj.latitude, longitude: obj.longitude,
-            nfcId: obj.nfcId ?? '', qrCode: obj.qrCode ?? '', audioUrl: obj.audioUrl ?? '' });
-        setFormKey(k => k + 1);
-        setMsg('');
-    };
-    const handleCancel = () => { setEditing(null); setForm(EMPTY); setFormKey(k => k + 1); setMsg(''); };
-    const handleSubmit = async () => {
+    // ── handlers ──────────────────────────────────────────────────────────────
+    const submitLoc = async () => {
         setLoading(true);
-        setMsg('');
         try {
             const fd = new FormData();
-            ['name', 'type', 'description', 'latitude', 'longitude', 'nfcId', 'qrCode', 'audioUrl']
-                .forEach(f => { if (form[f] != null && form[f] !== '')
-                fd.append(f, String(form[f])); });
-            if (form.imageFile)
-                fd.append('image', form.imageFile);
-            if (form.audioFile)
-                fd.append('audio', form.audioFile);
-            editing !== null
-                ? await updateObject(editing, fd, token)
-                : await createObject(fd, token);
-            setMsg(editing !== null ? 'Updated.' : 'Created.');
-            handleCancel();
-            load();
+            Object.entries(locForm).forEach(([k, v]) => { if (k !== 'imageFile' && v != null)
+                fd.append(k, String(v)); });
+            if (locForm.imageFile)
+                fd.append('image', locForm.imageFile);
+            editingLoc !== null ? await adminUpdateLocation(editingLoc, fd, token) : await adminCreateLocation(fd, token);
+            flash(editingLoc !== null ? 'Destination updated.' : 'Destination created.');
+            setLocForm({});
+            setEditingLoc(null);
+            fetchLocations().then(setLocations);
         }
         catch (e) {
-            setMsg(e.response?.data?.error ?? 'Error saving.');
+            flash(e.response?.data?.error ?? 'Error saving.');
         }
         setLoading(false);
     };
-    const handleDelete = async (id) => {
-        if (!confirm('Delete this object?'))
-            return;
+    const submitCat = async () => {
+        setLoading(true);
         try {
-            await deleteObject(id, token);
-            setMsg('Deleted.');
-            load();
+            const fd = new FormData();
+            if (catForm.name)
+                fd.append('name', catForm.name);
+            if (catForm.slug)
+                fd.append('slug', catForm.slug);
+            if (catForm.description)
+                fd.append('description', catForm.description);
+            if (catForm.imageFiles)
+                Array.from(catForm.imageFiles).forEach((f) => fd.append('images', f));
+            editingCat !== null ? await adminUpdateCategory(editingCat, fd, token) : await adminCreateCategory(fd, token);
+            flash(editingCat !== null ? 'Category updated.' : 'Category created.');
+            setCatForm({});
+            setEditingCat(null);
+            fetchCategories().then(setCategories);
         }
-        catch {
-            setMsg('Failed to delete.');
+        catch (e) {
+            flash(e.response?.data?.error ?? 'Error saving.');
         }
+        setLoading(false);
     };
-    const downloadQr = (obj) => {
-        const c = document.querySelector(`#qrdl-${obj.id}`);
-        if (!c)
-            return;
-        Object.assign(document.createElement('a'), { href: c.toDataURL('image/png'), download: `${obj.name}-qr.png` }).click();
+    const submitItem = async () => {
+        setLoading(true);
+        try {
+            const fd = new FormData();
+            Object.entries(itemForm).forEach(([k, v]) => {
+                if (k !== 'imageFiles' && k !== 'audioFile' && v != null)
+                    fd.append(k, String(v));
+            });
+            if (itemForm.audioFile)
+                fd.append('audio', itemForm.audioFile);
+            if (itemForm.imageFiles)
+                Array.from(itemForm.imageFiles).forEach((f) => fd.append('images', f));
+            editingItem !== null ? await adminUpdateItem(editingItem, fd, token) : await adminCreateItem(fd, token);
+            flash(editingItem !== null ? 'Feature updated.' : 'Feature created.');
+            setItemForm({});
+            setEditingItem(null);
+            fetchItems({ limit: 200 }).then(r => setItems(r.data));
+            fetchLocations().then(setLocations);
+        }
+        catch (e) {
+            flash(e.response?.data?.error ?? 'Error saving.');
+        }
+        setLoading(false);
     };
-    const totalPages = Math.ceil(objects.length / PAGE_SIZE);
-    const paged = objects.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-    /* ── Login ── */
+    const submitObj = async () => {
+        setLoading(true);
+        try {
+            const fd = new FormData();
+            Object.entries(objForm).forEach(([k, v]) => { if (k !== 'imageFile' && k !== 'audioFile' && v != null)
+                fd.append(k, String(v)); });
+            if (objForm.imageFile)
+                fd.append('image', objForm.imageFile);
+            if (objForm.audioFile)
+                fd.append('audio', objForm.audioFile);
+            editingObj !== null ? await updateObject(editingObj, fd, token) : await createObject(fd, token);
+            flash(editingObj !== null ? 'Object updated.' : 'Object created.');
+            setObjForm({});
+            setEditingObj(null);
+            fetchObjects(1, 200).then(r => setObjects(r.data));
+        }
+        catch (e) {
+            flash(e.response?.data?.error ?? 'Error saving.');
+        }
+        setLoading(false);
+    };
+    // ── Login ──────────────────────────────────────────────────────────────────
     if (!token)
-        return (_jsx("div", { className: "min-h-screen bg-slate-50 flex items-center justify-center px-6", children: _jsxs("div", { className: "w-full max-w-sm bg-white rounded-3xl shadow-sm p-8", children: [_jsxs("div", { className: "flex flex-col items-center mb-8", children: [_jsx("div", { className: "w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mb-3", children: _jsx(HiOutlineLockClosed, { size: 26, className: "text-blue-500" }) }), _jsx("h1", { className: "text-xl font-bold text-slate-800", children: "Admin Login" }), _jsx("p", { className: "text-xs text-slate-400 mt-1", children: "Smart Tourism Management" })] }), _jsxs("div", { className: "space-y-3", children: [_jsx("input", { className: "w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400", placeholder: "Username", value: username, onChange: e => setUsername(e.target.value), onKeyDown: e => e.key === 'Enter' && handleLogin() }), _jsx("input", { type: "password", className: "w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400", placeholder: "Password", value: password, onChange: e => setPassword(e.target.value), onKeyDown: e => e.key === 'Enter' && handleLogin() }), loginErr && _jsx("p", { className: "text-red-400 text-xs", children: loginErr }), _jsx("button", { onClick: handleLogin, className: "w-full bg-blue-500 text-white py-3 rounded-xl font-semibold hover:bg-blue-400 transition", children: "Sign In" })] })] }) }));
-    const inp = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400 bg-white';
-    /* ── Dashboard ── */
-    return (_jsxs("div", { className: "min-h-screen flex flex-col bg-slate-50", children: [_jsxs("header", { className: "bg-white border-b border-slate-100 px-5 py-3.5 flex items-center justify-between sticky top-0 z-10", children: [_jsx("h1", { className: "font-bold text-slate-800 text-sm", children: "Admin Dashboard" }), _jsxs("button", { onClick: handleLogout, className: "flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-400 transition", children: [_jsx(HiOutlineLogout, { size: 15 }), " Logout"] })] }), _jsxs("div", { className: "flex flex-col gap-3 p-4 max-w-2xl w-full mx-auto", children: [_jsxs("div", { className: "bg-white rounded-2xl shadow-sm flex-shrink-0 overflow-hidden", children: [_jsx("div", { className: "px-4 py-3 border-b border-slate-50 flex items-center gap-2 text-sm font-semibold text-slate-700", children: editing !== null
-                                    ? _jsxs(_Fragment, { children: [_jsx(HiOutlinePencil, { size: 14, className: "text-blue-500" }), " Edit Object"] })
-                                    : _jsxs(_Fragment, { children: [_jsx(HiOutlinePlus, { size: 14, className: "text-blue-500" }), " New Object"] }) }), _jsxs("div", { className: "p-4 space-y-2.5", children: [_jsxs("div", { className: "grid grid-cols-2 gap-2.5", children: [_jsx("input", { className: inp, placeholder: "Name *", value: form.name ?? '', onChange: e => setForm(f => ({ ...f, name: e.target.value })) }, `n${formKey}`), _jsxs("select", { className: inp, value: form.type ?? '', onChange: e => setForm(f => ({ ...f, type: e.target.value })), children: [_jsx("option", { value: "", children: "Type *" }), _jsx("option", { value: "animal", children: "Animal" }), _jsx("option", { value: "bird", children: "Bird" }), _jsx("option", { value: "tree", children: "Tree" }), _jsx("option", { value: "landmark", children: "Landmark" })] }, `t${formKey}`), _jsx("textarea", { className: `${inp} col-span-2 resize-none`, placeholder: "Description *", rows: 4, value: form.description ?? '', onChange: e => setForm(f => ({ ...f, description: e.target.value })) }, `d${formKey}`), _jsx("input", { className: inp, placeholder: "Latitude *", type: "number", value: form.latitude ?? '', onChange: e => setForm(f => ({ ...f, latitude: parseFloat(e.target.value) })) }, `la${formKey}`), _jsx("input", { className: inp, placeholder: "Longitude *", type: "number", value: form.longitude ?? '', onChange: e => setForm(f => ({ ...f, longitude: parseFloat(e.target.value) })) }, `lo${formKey}`), _jsx("input", { className: inp, placeholder: "NFC ID", value: form.nfcId ?? '', onChange: e => setForm(f => ({ ...f, nfcId: e.target.value })) }, `nf${formKey}`), _jsx("input", { className: inp, placeholder: "QR Code", value: form.qrCode ?? '', onChange: e => setForm(f => ({ ...f, qrCode: e.target.value })) }, `qr${formKey}`)] }), _jsxs("div", { className: "grid grid-cols-2 gap-2.5", children: [_jsxs("div", { children: [_jsx("label", { className: "text-xs text-slate-400 mb-1 block", children: "Image" }), _jsx("input", { type: "file", accept: "image/*", className: "text-xs text-slate-500 w-full", onChange: e => setForm(f => ({ ...f, imageFile: e.target.files?.[0] })) }, `im${formKey}`)] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs text-slate-400 mb-1 block", children: "Audio" }), _jsx("input", { type: "file", accept: "audio/*", className: "text-xs text-slate-500 w-full", onChange: e => setForm(f => ({ ...f, audioFile: e.target.files?.[0] })) }, `au${formKey}`)] })] }), _jsx("input", { className: inp, placeholder: "Or paste audio URL", value: form.audioUrl ?? '', onChange: e => setForm(f => ({ ...f, audioUrl: e.target.value })) }, `au2${formKey}`), msg && _jsx("p", { className: `text-xs ${msg.includes('Error') || msg.includes('Failed') ? 'text-red-400' : 'text-green-500'}`, children: msg }), _jsxs("div", { className: "flex gap-2", children: [_jsx("button", { onClick: handleSubmit, disabled: loading, className: "flex-1 bg-blue-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-400 disabled:opacity-50 transition", children: loading ? 'Saving…' : editing !== null ? 'Update' : 'Create' }), editing !== null && (_jsx("button", { onClick: handleCancel, className: "px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-500 hover:bg-slate-50 transition", children: "Cancel" }))] })] })] }), _jsxs("div", { className: "flex flex-col bg-white rounded-2xl shadow-sm overflow-hidden", children: [_jsxs("div", { className: "px-4 py-3 border-b border-slate-50 flex items-center justify-between flex-shrink-0", children: [_jsxs("span", { className: "text-sm font-semibold text-slate-700", children: ["Objects ", _jsxs("span", { className: "text-slate-400 font-normal", children: ["(", objects.length, ")"] })] }), _jsxs("div", { className: "flex items-center gap-1 text-xs text-slate-400", children: [_jsx("button", { onClick: () => setPage(p => Math.max(1, p - 1)), disabled: page === 1, className: "p-1 disabled:opacity-30 hover:text-blue-500 transition rounded-lg hover:bg-slate-50", children: _jsx(HiChevronLeft, { size: 16 }) }), _jsxs("span", { className: "px-1", children: [page, " / ", Math.max(1, totalPages)] }), _jsx("button", { onClick: () => setPage(p => Math.min(Math.max(1, totalPages), p + 1)), disabled: page >= Math.max(1, totalPages), className: "p-1 disabled:opacity-30 hover:text-blue-500 transition rounded-lg hover:bg-slate-50", children: _jsx(HiChevronRight, { size: 16 }) })] })] }), _jsxs("div", { className: "divide-y divide-slate-50", children: [objects.length === 0 && (_jsx("p", { className: "text-center text-slate-400 text-sm py-12", children: "No objects yet." })), paged.map(obj => (_jsxs("div", { className: "flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition", children: [obj.imageUrl
-                                                ? _jsx("img", { src: obj.imageUrl, alt: obj.name, className: "w-12 h-12 rounded-xl object-cover flex-shrink-0" })
-                                                : _jsx("div", { className: "w-12 h-12 rounded-xl bg-slate-100 flex-shrink-0" }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("p", { className: "text-sm font-semibold text-slate-800 truncate", children: obj.name }), _jsx("p", { className: "text-xs text-slate-400 capitalize", children: obj.type })] }), _jsxs("div", { className: "flex items-center gap-2 flex-shrink-0", children: [_jsx("button", { onClick: () => setPreview(obj), className: "text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition font-medium", children: "Preview" }), _jsx("button", { onClick: () => handleEdit(obj), className: "p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-500 transition", children: _jsx(HiOutlinePencil, { size: 15 }) }), _jsx("button", { onClick: () => handleDelete(obj.id), className: "p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-400 transition", children: _jsx(HiOutlineTrash, { size: 15 }) })] }), _jsx("div", { className: "hidden", children: _jsx(QRCodeCanvas, { id: `qrdl-${obj.id}`, value: qrUrl(obj), size: 512, level: "H", includeMargin: true }) })] }, obj.id)))] })] })] }), preview && (_jsx("div", { className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4", onClick: () => setPreview(null), children: _jsxs("div", { className: "bg-white rounded-3xl w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-2xl", onClick: e => e.stopPropagation(), children: [_jsxs("div", { className: "relative", children: [preview.imageUrl
-                                    ? _jsx("img", { src: preview.imageUrl, alt: preview.name, className: "w-full h-48 object-cover rounded-t-3xl" })
-                                    : _jsx("div", { className: "w-full h-32 bg-slate-100 rounded-t-3xl" }), _jsx("button", { onClick: () => setPreview(null), className: "absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition", children: _jsx(HiX, { size: 16 }) })] }), _jsxs("div", { className: "p-5 space-y-4", children: [_jsxs("div", { children: [_jsx("h2", { className: "text-lg font-bold text-slate-800", children: preview.name }), _jsx("p", { className: "text-xs text-slate-400 capitalize mt-0.5", children: preview.type })] }), _jsx("p", { className: "text-sm text-slate-600 leading-relaxed", children: preview.description }), preview.audioUrl
-                                    ? _jsx(PreviewAudio, { src: preview.audioUrl })
-                                    : (_jsxs("div", { className: "flex items-center gap-3 bg-slate-50 border border-dashed border-slate-200 rounded-2xl px-4 py-3", children: [_jsx("div", { className: "w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0", children: _jsx(HiPlay, { size: 16, className: "text-slate-300 ml-0.5" }) }), _jsx("span", { className: "text-sm text-slate-400", children: "No audio \u2014 add one by editing this object" })] })), nfcUrl(preview) && (_jsxs("div", { className: "rounded-2xl bg-blue-50 border border-blue-100 p-4 space-y-2", children: [_jsxs("p", { className: "flex items-center gap-1.5 text-xs font-semibold text-blue-600", children: [_jsx(MdNfc, { size: 15 }), " NFC Tag URL"] }), _jsx("p", { className: "text-xs text-slate-500", children: "Copy this URL and write it to a physical NFC card:" }), _jsx("code", { className: "block text-xs bg-white border border-blue-100 rounded-xl px-3 py-2 text-blue-600 break-all select-all", children: nfcUrl(preview) })] })), _jsxs("div", { className: "rounded-2xl bg-slate-50 border border-slate-100 p-4 flex flex-col items-center gap-3", children: [_jsxs("p", { className: "flex items-center gap-1.5 text-xs font-semibold text-slate-600 self-start", children: [_jsx(MdQrCode, { size: 15 }), " QR Code"] }), _jsx("div", { className: "bg-white p-2 rounded-xl border border-slate-100 shadow-sm", children: _jsx(QRCodeCanvas, { value: qrUrl(preview), size: 160, level: "H", includeMargin: true }) }), _jsx("code", { className: "text-xs text-slate-400 break-all text-center", children: qrUrl(preview) }), _jsxs("button", { onClick: () => downloadQr(preview), className: "flex items-center gap-2 px-5 py-2.5 bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold rounded-xl transition w-full justify-center", children: [_jsx(HiDownload, { size: 15 }), " Download QR"] })] }), _jsxs("button", { onClick: () => handleEdit(preview), className: "flex items-center justify-center gap-2 w-full py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition", children: [_jsx(HiOutlinePencil, { size: 14 }), " Edit this object"] })] })] }) }))] }));
+        return (_jsxs("div", { className: "min-h-screen bg-white flex flex-col", children: [_jsx("div", { className: "flex-1 flex items-center justify-center px-6 py-12", children: _jsxs("div", { className: "w-full max-w-sm bg-white border border-slate-100 rounded-3xl shadow-lg p-8", children: [_jsxs("div", { className: "flex flex-col items-center mb-8", children: [_jsx("div", { className: "w-16 h-16 rounded-3xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-4", children: _jsx(HiOutlineLockClosed, { size: 28, className: "text-blue-500" }) }), _jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "Admin Login" }), _jsx("p", { className: "text-sm text-slate-400 mt-1", children: "Smart Tourism Management" })] }), _jsxs("div", { className: "space-y-4", children: [_jsxs("div", { className: "relative", children: [_jsx(HiOutlineUser, { size: 16, className: "absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" }), _jsx("input", { className: "w-full border border-slate-200 rounded-2xl pl-10 pr-4 py-3 text-sm outline-none focus:border-blue-400 text-slate-800 placeholder:text-slate-400", placeholder: "Username", value: username, onChange: e => setUsername(e.target.value), onKeyDown: e => e.key === 'Enter' && handleLogin() })] }), _jsxs("div", { className: "relative", children: [_jsx(HiOutlineLockClosed, { size: 16, className: "absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" }), _jsx("input", { type: showPw ? 'text' : 'password', className: "w-full border border-slate-200 rounded-2xl pl-10 pr-11 py-3 text-sm outline-none focus:border-blue-400 text-slate-800 placeholder:text-slate-400", placeholder: "Password", value: password, onChange: e => setPassword(e.target.value), onKeyDown: e => e.key === 'Enter' && handleLogin() }), _jsx("button", { type: "button", onClick: () => setShowPw(v => !v), className: "absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500 transition", children: showPw ? _jsx(HiEyeOff, { size: 17 }) : _jsx(HiEye, { size: 17 }) })] }), loginErr && (_jsxs("p", { className: "flex items-center gap-2 text-red-500 text-xs bg-red-50 px-3 py-2 rounded-xl", children: [_jsx(HiXCircle, { size: 14 }), " ", loginErr] })), _jsx("button", { onClick: handleLogin, className: "w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-2xl font-semibold transition shadow-sm shadow-blue-200", children: "Sign In" })] })] }) }), _jsx(Footer, {})] }));
+    const isErr = msg.toLowerCase().includes('error') || msg.toLowerCase().includes('failed');
+    // ── Dashboard ──────────────────────────────────────────────────────────────
+    return (_jsxs("div", { className: "min-h-screen bg-slate-50 flex flex-col", children: [_jsxs("header", { className: "bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-40 shadow-sm", children: [_jsxs("div", { className: "flex items-center gap-3", children: [_jsx("div", { className: "w-8 h-8 rounded-xl bg-blue-500 flex items-center justify-center", children: _jsx(TbMapPin, { size: 16, className: "text-white" }) }), _jsx("span", { className: "font-bold text-slate-800", children: "Admin Dashboard" })] }), _jsxs("button", { onClick: handleLogout, className: "flex items-center gap-2 text-sm text-slate-500 hover:text-red-500 transition px-3 py-2 rounded-xl hover:bg-red-50", children: [_jsx(HiOutlineLogout, { size: 16 }), " Logout"] })] }), _jsx("div", { className: "bg-white border-b border-slate-100 px-4 flex gap-1 overflow-x-auto", children: TAB_CONFIG.map(t => (_jsxs("button", { onClick: () => setTab(t.key), className: `flex items-center gap-2 px-4 py-3.5 text-sm font-semibold whitespace-nowrap border-b-2 transition ${tab === t.key
+                        ? 'border-blue-500 text-blue-500'
+                        : 'border-transparent text-slate-500 hover:text-slate-700'}`, children: [t.icon, " ", t.label] }, t.key))) }), msg && (_jsxs("div", { className: `mx-4 mt-4 flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-medium ${isErr ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'}`, children: [isErr ? _jsx(HiXCircle, { size: 16 }) : _jsx(HiCheckCircle, { size: 16 }), msg] })), _jsxs("div", { className: "max-w-3xl mx-auto w-full p-4 space-y-5 flex-1", children: [tab === 'locations' && (_jsxs(_Fragment, { children: [_jsxs("div", { className: "bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-4", children: [_jsx("div", { className: "flex items-center gap-2 text-slate-700 font-bold text-sm border-b border-slate-50 pb-3", children: editingLoc !== null
+                                            ? _jsxs(_Fragment, { children: [_jsx(HiOutlinePencil, { size: 15, className: "text-blue-500" }), " Edit Destination"] })
+                                            : _jsxs(_Fragment, { children: [_jsx(HiOutlinePlus, { size: 15, className: "text-blue-500" }), " Add Destination"] }) }), _jsx("input", { className: inp, placeholder: "Name *", value: locForm.name ?? '', onChange: e => setLocForm((f) => ({ ...f, name: e.target.value })) }), _jsx("textarea", { className: inp, rows: 3, placeholder: "Description *", value: locForm.description ?? '', onChange: e => setLocForm((f) => ({ ...f, description: e.target.value })) }), _jsx("input", { className: inp, placeholder: "Video URL", value: locForm.videoUrl ?? '', onChange: e => setLocForm((f) => ({ ...f, videoUrl: e.target.value })) }), _jsxs("div", { className: "grid grid-cols-2 gap-3", children: [_jsx("input", { className: inp, placeholder: "Latitude", type: "number", value: locForm.latitude ?? '', onChange: e => setLocForm((f) => ({ ...f, latitude: e.target.value })) }), _jsx("input", { className: inp, placeholder: "Longitude", type: "number", value: locForm.longitude ?? '', onChange: e => setLocForm((f) => ({ ...f, longitude: e.target.value })) })] }), _jsxs("div", { children: [_jsxs("label", { className: label, children: [_jsx(HiOutlinePhotograph, { size: 12, className: "inline mr-1" }), "Cover Image"] }), _jsx("input", { type: "file", accept: "image/*", className: "text-sm text-slate-500 w-full", onChange: e => setLocForm((f) => ({ ...f, imageFile: e.target.files?.[0] })) })] }), _jsxs("label", { className: "flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none", children: [_jsx("input", { type: "checkbox", className: "accent-blue-500", checked: locForm.featured === 'true' || locForm.featured === true, onChange: e => setLocForm((f) => ({ ...f, featured: e.target.checked ? 'true' : 'false' })) }), "Featured on homepage"] }), _jsxs("div", { className: "flex gap-2 pt-1", children: [_jsx("button", { onClick: submitLoc, disabled: loading, className: "flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-2xl text-sm font-semibold disabled:opacity-50 transition", children: loading ? 'Saving…' : editingLoc !== null ? 'Update' : 'Create' }), editingLoc !== null && _jsx("button", { onClick: () => { setEditingLoc(null); setLocForm({}); }, className: "px-4 py-2.5 border border-slate-200 rounded-2xl text-sm text-slate-500 hover:bg-slate-50 transition", children: "Cancel" })] })] }), _jsxs("div", { className: "space-y-3", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("p", { className: "text-sm font-bold text-slate-700", children: ["Destinations (", locations.length, ")"] }), Math.ceil(locations.length / PAGE) > 1 && (_jsxs("div", { className: "flex items-center gap-1 text-xs text-slate-400", children: [_jsx("button", { onClick: () => setLocPage(p => Math.max(1, p - 1)), disabled: locPage === 1, className: "p-1 disabled:opacity-30 hover:text-blue-500", children: _jsx(HiChevronLeft, { size: 15 }) }), locPage, " / ", Math.ceil(locations.length / PAGE), _jsx("button", { onClick: () => setLocPage(p => Math.min(Math.ceil(locations.length / PAGE), p + 1)), disabled: locPage === Math.ceil(locations.length / PAGE), className: "p-1 disabled:opacity-30 hover:text-blue-500", children: _jsx(HiChevronRight, { size: 15 }) })] }))] }), locations.slice((locPage - 1) * PAGE, locPage * PAGE).map(loc => (_jsxs("div", { className: "bg-white rounded-3xl p-4 shadow-sm border border-slate-100 flex gap-3", children: [loc.coverImage
+                                                ? _jsx("img", { src: loc.coverImage, alt: loc.name, className: "w-16 h-16 rounded-2xl object-cover flex-shrink-0" })
+                                                : _jsx("div", { className: "w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0", children: _jsx(MdPark, { size: 24, className: "text-blue-300" }) }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("p", { className: "font-bold text-slate-800 text-sm", children: loc.name }), _jsx("p", { className: "text-xs text-slate-500 mt-0.5 line-clamp-2", children: loc.description }), _jsxs("p", { className: "text-xs text-blue-400 mt-1 flex items-center gap-1", children: [_jsx(HiOutlineLocationMarker, { size: 11 }), " ", loc._count?.items ?? 0, " features"] })] }), _jsxs("div", { className: "flex flex-col gap-2 flex-shrink-0", children: [_jsxs("button", { onClick: () => { setEditingLoc(loc.id); setLocForm({ name: loc.name, description: loc.description, videoUrl: loc.videoUrl ?? '', latitude: loc.latitude, longitude: loc.longitude, featured: String(loc.featured) }); window.scrollTo({ top: 0, behavior: 'smooth' }); }, className: "flex items-center gap-1 text-xs text-blue-500 hover:underline", children: [_jsx(HiOutlinePencil, { size: 12 }), " Edit"] }), _jsxs("button", { onClick: async () => { if (!confirm('Delete this destination?'))
+                                                            return; await adminDeleteLocation(loc.id, token); fetchLocations().then(setLocations); flash('Deleted.'); }, className: "flex items-center gap-1 text-xs text-red-400 hover:underline", children: [_jsx(HiOutlineTrash, { size: 12 }), " Delete"] })] })] }, loc.id)))] })] })), tab === 'categories' && (_jsxs(_Fragment, { children: [_jsxs("div", { className: "bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-4", children: [_jsx("div", { className: "flex items-center gap-2 text-slate-700 font-bold text-sm border-b border-slate-50 pb-3", children: editingCat !== null
+                                            ? _jsxs(_Fragment, { children: [_jsx(HiOutlinePencil, { size: 15, className: "text-blue-500" }), " Edit Category"] })
+                                            : _jsxs(_Fragment, { children: [_jsx(HiOutlinePlus, { size: 15, className: "text-blue-500" }), " Add Category"] }) }), _jsx("input", { className: inp, placeholder: "Name * (e.g. Birds)", value: catForm.name ?? '', onChange: e => setCatForm((f) => ({ ...f, name: e.target.value })) }), _jsx("input", { className: inp, placeholder: "Slug * (e.g. birds \u2014 lowercase, no spaces)", value: catForm.slug ?? '', onChange: e => setCatForm((f) => ({ ...f, slug: e.target.value })) }), _jsx("textarea", { className: inp, rows: 3, placeholder: "Short description of this category", value: catForm.description ?? '', onChange: e => setCatForm((f) => ({ ...f, description: e.target.value })) }), _jsxs("div", { children: [_jsxs("label", { className: label, children: [_jsx(HiOutlinePhotograph, { size: 12, className: "inline mr-1" }), "Category Images (multiple allowed)"] }), _jsx("input", { type: "file", accept: "image/*", multiple: true, className: "text-sm text-slate-500 w-full file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-500 hover:file:bg-blue-100", onChange: e => setCatForm((f) => ({ ...f, imageFiles: e.target.files })) }), _jsx("p", { className: "text-xs text-slate-400 mt-1", children: "These images will appear in a slideshow when tourists browse this category." })] }), _jsxs("div", { className: "flex gap-2 pt-1", children: [_jsx("button", { onClick: submitCat, disabled: loading, className: "flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-2xl text-sm font-semibold disabled:opacity-50 transition", children: loading ? 'Saving…' : editingCat !== null ? 'Update' : 'Create' }), editingCat !== null && _jsx("button", { onClick: () => { setEditingCat(null); setCatForm({}); }, className: "px-4 py-2.5 border border-slate-200 rounded-2xl text-sm text-slate-500 hover:bg-slate-50 transition", children: "Cancel" })] })] }), _jsx("div", { className: "space-y-3", children: categories.map(cat => (_jsx("div", { className: "bg-white rounded-3xl p-4 shadow-sm border border-slate-100", children: _jsxs("div", { className: "flex gap-3", children: [cat.images?.length > 0
+                                                ? _jsxs("div", { className: "flex gap-1.5 flex-shrink-0", children: [cat.images.slice(0, 3).map((img, i) => (_jsx("img", { src: img.url, alt: cat.name, className: "w-14 h-14 rounded-2xl object-cover" }, i))), cat.images.length > 3 && (_jsxs("div", { className: "w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-xs font-bold text-blue-400", children: ["+", cat.images.length - 3] }))] })
+                                                : _jsx("div", { className: "w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0", children: _jsx(HiOutlinePhotograph, { size: 22, className: "text-blue-300" }) }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("p", { className: "font-bold text-slate-800 text-sm", children: cat.name }), cat.description && _jsx("p", { className: "text-xs text-slate-500 mt-0.5 line-clamp-2", children: cat.description }), _jsxs("p", { className: "text-xs text-blue-400 mt-1", children: [cat._count?.items ?? 0, " features"] })] }), _jsxs("div", { className: "flex flex-col gap-2 flex-shrink-0", children: [_jsxs("button", { onClick: () => { setEditingCat(cat.id); setCatForm({ name: cat.name, slug: cat.slug ?? '', description: cat.description ?? '' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }, className: "flex items-center gap-1 text-xs text-blue-500 hover:underline", children: [_jsx(HiOutlinePencil, { size: 12 }), " Edit"] }), _jsxs("button", { onClick: async () => { if (!confirm('Delete this category?'))
+                                                            return; await adminDeleteCategory(cat.id, token); fetchCategories().then(setCategories); flash('Deleted.'); }, className: "flex items-center gap-1 text-xs text-red-400 hover:underline", children: [_jsx(HiOutlineTrash, { size: 12 }), " Delete"] })] })] }) }, cat.id))) })] })), tab === 'items' && (_jsxs(_Fragment, { children: [_jsxs("div", { className: "bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-4", children: [_jsx("div", { className: "flex items-center gap-2 text-slate-700 font-bold text-sm border-b border-slate-50 pb-3", children: editingItem !== null
+                                            ? _jsxs(_Fragment, { children: [_jsx(HiOutlinePencil, { size: 15, className: "text-blue-500" }), " Edit Feature"] })
+                                            : _jsxs(_Fragment, { children: [_jsx(HiOutlinePlus, { size: 15, className: "text-blue-500" }), " Add Feature"] }) }), _jsx("input", { className: inp, placeholder: "Name *", value: itemForm.name ?? '', onChange: e => setItemForm((f) => ({ ...f, name: e.target.value })) }), _jsx("textarea", { className: inp, rows: 3, placeholder: "Description *", value: itemForm.description ?? '', onChange: e => setItemForm((f) => ({ ...f, description: e.target.value })) }), _jsxs("div", { className: "grid grid-cols-2 gap-3", children: [_jsxs("select", { className: inp, value: itemForm.locationId ?? '', onChange: e => setItemForm((f) => ({ ...f, locationId: e.target.value })), children: [_jsx("option", { value: "", children: "Destination *" }), locations.map(l => _jsx("option", { value: l.id, children: l.name }, l.id))] }), _jsxs("select", { className: inp, value: itemForm.categoryId ?? '', onChange: e => setItemForm((f) => ({ ...f, categoryId: e.target.value })), children: [_jsx("option", { value: "", children: "Category *" }), categories.map(c => _jsx("option", { value: c.id, children: c.name }, c.id))] })] }), _jsx("textarea", { className: inp, rows: 2, placeholder: "Habitat", value: itemForm.habitat ?? '', onChange: e => setItemForm((f) => ({ ...f, habitat: e.target.value })) }), _jsx("textarea", { className: inp, rows: 2, placeholder: "Conservation status", value: itemForm.conservation ?? '', onChange: e => setItemForm((f) => ({ ...f, conservation: e.target.value })) }), _jsx("textarea", { className: inp, rows: 2, placeholder: "Interesting facts (one per line)", value: itemForm.facts ?? '', onChange: e => setItemForm((f) => ({ ...f, facts: e.target.value })) }), _jsx("input", { className: inp, placeholder: "Duration (e.g. 2\u20133 hours)", value: itemForm.duration ?? '', onChange: e => setItemForm((f) => ({ ...f, duration: e.target.value })) }), _jsxs("div", { className: "space-y-3", children: [_jsxs("div", { children: [_jsxs("label", { className: label, children: [_jsx(HiOutlinePhotograph, { size: 12, className: "inline mr-1" }), "Images (multiple allowed)"] }), _jsx("input", { type: "file", accept: "image/*", multiple: true, className: "text-sm text-slate-500 w-full", onChange: e => setItemForm((f) => ({ ...f, imageFiles: e.target.files })) })] }), _jsxs("div", { children: [_jsxs("label", { className: label, children: [_jsx(HiOutlineMusicNote, { size: 12, className: "inline mr-1" }), "Audio Narration"] }), _jsx("input", { type: "file", accept: "audio/*", className: "text-sm text-slate-500 w-full", onChange: e => setItemForm((f) => ({ ...f, audioFile: e.target.files?.[0] })) })] }), _jsxs("div", { children: [_jsxs("label", { className: label, children: [_jsx(HiOutlineFilm, { size: 12, className: "inline mr-1" }), "Video URL"] }), _jsx("input", { className: inp, placeholder: "Paste video URL", value: itemForm.videoUrl ?? '', onChange: e => setItemForm((f) => ({ ...f, videoUrl: e.target.value })) })] })] }), _jsxs("div", { className: "flex gap-2 pt-1", children: [_jsx("button", { onClick: submitItem, disabled: loading, className: "flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-2xl text-sm font-semibold disabled:opacity-50 transition", children: loading ? 'Saving…' : editingItem !== null ? 'Update' : 'Create' }), editingItem !== null && _jsx("button", { onClick: () => { setEditingItem(null); setItemForm({}); }, className: "px-4 py-2.5 border border-slate-200 rounded-2xl text-sm text-slate-500 hover:bg-slate-50 transition", children: "Cancel" })] })] }), _jsxs("div", { className: "space-y-3", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("p", { className: "text-sm font-bold text-slate-700", children: ["Features (", items.length, ")"] }), Math.ceil(items.length / PAGE) > 1 && (_jsxs("div", { className: "flex items-center gap-1 text-xs text-slate-400", children: [_jsx("button", { onClick: () => setItemPage(p => Math.max(1, p - 1)), disabled: itemPage === 1, className: "p-1 disabled:opacity-30 hover:text-blue-500", children: _jsx(HiChevronLeft, { size: 15 }) }), itemPage, " / ", Math.ceil(items.length / PAGE), _jsx("button", { onClick: () => setItemPage(p => Math.min(Math.ceil(items.length / PAGE), p + 1)), disabled: itemPage === Math.ceil(items.length / PAGE), className: "p-1 disabled:opacity-30 hover:text-blue-500", children: _jsx(HiChevronRight, { size: 15 }) })] }))] }), items.slice((itemPage - 1) * PAGE, itemPage * PAGE).map(item => (_jsxs("div", { className: "bg-white rounded-3xl p-4 shadow-sm border border-slate-100 flex gap-3", children: [item.media[0]
+                                                ? _jsx("img", { src: item.media[0].url, alt: item.name, className: "w-16 h-16 rounded-2xl object-cover flex-shrink-0" })
+                                                : _jsx("div", { className: "w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0", children: _jsx(MdOutlinePlace, { size: 24, className: "text-blue-300" }) }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("p", { className: "font-bold text-slate-800 text-sm truncate", children: item.name }), _jsxs("p", { className: "text-xs text-slate-500", children: [item.location.name, " \u00B7 ", item.category.name] }), _jsx("p", { className: "text-xs text-slate-400 mt-0.5 line-clamp-1", children: item.description }), _jsxs("div", { className: "flex gap-2 mt-1.5", children: [item.audioUrl && _jsxs("span", { className: "flex items-center gap-1 text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full", children: [_jsx(HiOutlineMusicNote, { size: 10 }), " Audio"] }), item.videoUrl && _jsxs("span", { className: "flex items-center gap-1 text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full", children: [_jsx(HiOutlineFilm, { size: 10 }), " Video"] }), item.media.length > 0 && _jsxs("span", { className: "flex items-center gap-1 text-xs text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full", children: [_jsx(HiOutlinePhotograph, { size: 10 }), " ", item.media.length] })] })] }), _jsxs("div", { className: "flex flex-col gap-2 flex-shrink-0", children: [_jsxs("button", { onClick: () => { setEditingItem(item.id); setItemForm({ name: item.name, description: item.description, locationId: String(item.location.id), categoryId: String(item.category.id), habitat: item.habitat ?? '', conservation: item.conservation ?? '', facts: item.facts ?? '', duration: item.duration ?? '', videoUrl: item.videoUrl ?? '' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }, className: "flex items-center gap-1 text-xs text-blue-500 hover:underline", children: [_jsx(HiOutlinePencil, { size: 12 }), " Edit"] }), _jsxs("button", { onClick: async () => { if (!confirm('Delete this feature?'))
+                                                            return; await adminDeleteItem(item.id, token); fetchItems({ limit: 200 }).then(r => setItems(r.data)); flash('Deleted.'); }, className: "flex items-center gap-1 text-xs text-red-400 hover:underline", children: [_jsx(HiOutlineTrash, { size: 12 }), " Delete"] })] })] }, item.id)))] })] })), tab === 'objects' && (_jsxs(_Fragment, { children: [_jsxs("div", { className: "bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-4", children: [_jsx("div", { className: "flex items-center gap-2 text-slate-700 font-bold text-sm border-b border-slate-50 pb-3", children: editingObj !== null
+                                            ? _jsxs(_Fragment, { children: [_jsx(HiOutlinePencil, { size: 15, className: "text-blue-500" }), " Edit NFC Object"] })
+                                            : _jsxs(_Fragment, { children: [_jsx(HiOutlinePlus, { size: 15, className: "text-blue-500" }), " Add NFC Object"] }) }), _jsxs("div", { className: "grid grid-cols-2 gap-3", children: [_jsx("input", { className: inp, placeholder: "Name *", value: objForm.name ?? '', onChange: e => setObjForm((f) => ({ ...f, name: e.target.value })) }), _jsxs("select", { className: inp, value: objForm.type ?? '', onChange: e => setObjForm((f) => ({ ...f, type: e.target.value })), children: [_jsx("option", { value: "", children: "Type *" }), _jsx("option", { value: "animal", children: "Animal" }), _jsx("option", { value: "bird", children: "Bird" }), _jsx("option", { value: "tree", children: "Tree" }), _jsx("option", { value: "landmark", children: "Landmark" })] })] }), _jsx("textarea", { className: inp, rows: 2, placeholder: "Description *", value: objForm.description ?? '', onChange: e => setObjForm((f) => ({ ...f, description: e.target.value })) }), _jsxs("div", { className: "grid grid-cols-2 gap-3", children: [_jsx("input", { className: inp, placeholder: "Latitude *", type: "number", value: objForm.latitude ?? '', onChange: e => setObjForm((f) => ({ ...f, latitude: e.target.value })) }), _jsx("input", { className: inp, placeholder: "Longitude *", type: "number", value: objForm.longitude ?? '', onChange: e => setObjForm((f) => ({ ...f, longitude: e.target.value })) }), _jsx("input", { className: inp, placeholder: "NFC ID (unique)", value: objForm.nfcId ?? '', onChange: e => setObjForm((f) => ({ ...f, nfcId: e.target.value })) }), _jsx("input", { className: inp, placeholder: "QR Code (unique)", value: objForm.qrCode ?? '', onChange: e => setObjForm((f) => ({ ...f, qrCode: e.target.value })) })] }), _jsxs("div", { className: "grid grid-cols-2 gap-3", children: [_jsxs("div", { children: [_jsxs("label", { className: label, children: [_jsx(HiOutlinePhotograph, { size: 12, className: "inline mr-1" }), "Image"] }), _jsx("input", { type: "file", accept: "image/*", className: "text-sm text-slate-500 w-full", onChange: e => setObjForm((f) => ({ ...f, imageFile: e.target.files?.[0] })) })] }), _jsxs("div", { children: [_jsxs("label", { className: label, children: [_jsx(HiOutlineMusicNote, { size: 12, className: "inline mr-1" }), "Audio"] }), _jsx("input", { type: "file", accept: "audio/*", className: "text-sm text-slate-500 w-full", onChange: e => setObjForm((f) => ({ ...f, audioFile: e.target.files?.[0] })) })] })] }), _jsxs("div", { className: "flex gap-2 pt-1", children: [_jsx("button", { onClick: submitObj, disabled: loading, className: "flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-2xl text-sm font-semibold disabled:opacity-50 transition", children: loading ? 'Saving…' : editingObj !== null ? 'Update' : 'Create' }), editingObj !== null && _jsx("button", { onClick: () => { setEditingObj(null); setObjForm({}); }, className: "px-4 py-2.5 border border-slate-200 rounded-2xl text-sm text-slate-500 hover:bg-slate-50 transition", children: "Cancel" })] })] }), _jsxs("div", { className: "space-y-3 pb-6", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("p", { className: "text-sm font-bold text-slate-700", children: ["NFC Objects (", objects.length, ")"] }), Math.ceil(objects.length / PAGE) > 1 && (_jsxs("div", { className: "flex items-center gap-1 text-xs text-slate-400", children: [_jsx("button", { onClick: () => setObjPage(p => Math.max(1, p - 1)), disabled: objPage === 1, className: "p-1 disabled:opacity-30 hover:text-blue-500", children: _jsx(HiChevronLeft, { size: 15 }) }), objPage, " / ", Math.ceil(objects.length / PAGE), _jsx("button", { onClick: () => setObjPage(p => Math.min(Math.ceil(objects.length / PAGE), p + 1)), disabled: objPage === Math.ceil(objects.length / PAGE), className: "p-1 disabled:opacity-30 hover:text-blue-500", children: _jsx(HiChevronRight, { size: 15 }) })] }))] }), objects.slice((objPage - 1) * PAGE, objPage * PAGE).map(obj => (_jsxs("div", { className: "bg-white rounded-3xl p-4 shadow-sm border border-slate-100 flex gap-3", children: [obj.imageUrl
+                                                ? _jsx("img", { src: obj.imageUrl, alt: obj.name, className: "w-16 h-16 rounded-2xl object-cover flex-shrink-0" })
+                                                : _jsx("div", { className: "w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0", children: TYPE_ICON[obj.type] ?? _jsx(MdOutlinePlace, { size: 22, className: "text-blue-300" }) }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("p", { className: "font-bold text-slate-800 text-sm truncate", children: obj.name }), _jsx("p", { className: "text-xs text-slate-500 capitalize", children: obj.type }), _jsxs("div", { className: "flex gap-2 mt-1.5 flex-wrap", children: [obj.nfcId && _jsxs("span", { className: "flex items-center gap-1 text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full", children: [_jsx(MdNfc, { size: 10 }), " ", obj.nfcId] }), obj.qrCode && _jsxs("span", { className: "flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full", children: [_jsx(MdQrCode, { size: 10 }), " ", obj.qrCode] })] })] }), _jsxs("div", { className: "flex flex-col gap-2 flex-shrink-0", children: [_jsxs("button", { onClick: () => { setEditingObj(obj.id); setObjForm({ name: obj.name, type: obj.type, description: obj.description, latitude: String(obj.latitude), longitude: String(obj.longitude), nfcId: obj.nfcId ?? '', qrCode: obj.qrCode ?? '' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }, className: "flex items-center gap-1 text-xs text-blue-500 hover:underline", children: [_jsx(HiOutlinePencil, { size: 12 }), " Edit"] }), _jsxs("button", { onClick: async () => { if (!confirm('Delete this object?'))
+                                                            return; await deleteObject(obj.id, token); fetchObjects(1, 200).then(r => setObjects(r.data)); flash('Deleted.'); }, className: "flex items-center gap-1 text-xs text-red-400 hover:underline", children: [_jsx(HiOutlineTrash, { size: 12 }), " Delete"] })] })] }, obj.id)))] })] }))] }), _jsx(Footer, {})] }));
 }

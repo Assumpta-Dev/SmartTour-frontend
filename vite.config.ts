@@ -3,6 +3,20 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  build: {
+    target: 'es2018',
+    cssCodeSplit: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react':   ['react', 'react-dom', 'react-router-dom'],
+          'vendor-leaflet': ['leaflet', 'react-leaflet'],
+          'vendor-motion':  ['framer-motion'],
+          'vendor-swiper':  ['swiper'],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
