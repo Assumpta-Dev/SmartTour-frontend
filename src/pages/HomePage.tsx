@@ -307,13 +307,13 @@ export default function HomePage() {
               <div className="flex items-center justify-between mb-4">
                 <p className="text-base font-bold text-slate-800">Browse by Category</p>
               </div>
-              <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar">
+              <div className="flex gap-2.5 overflow-x-auto pb-2 pr-4 scroll-smooth touch-pan-x select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {categories.map(cat => (
                   <motion.button
                     key={cat.id}
                     whileHover={{ y: -2 }}
                     whileTap={{ scale: 0.96 }}
-                    onClick={() => navigate(`/locations`)}
+                    onClick={() => navigate(`/category/${cat.slug}`)}
                     className="flex-shrink-0 flex items-center gap-2 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 rounded-xl px-4 py-2.5 transition shadow-sm"
                   >
                     <span className="text-blue-500">{CAT_ICON[cat.slug] ?? <MdAccountBalance size={16} />}</span>
@@ -335,12 +335,12 @@ export default function HomePage() {
               <div className="flex items-center justify-between mb-4">
                 <p className="text-base font-bold text-slate-800">Featured Attractions</p>
                 <button
-                  onClick={() => navigate('/locations')}
+                  onClick={() => navigate('/items')}
                   className="text-xs text-blue-500 font-semibold hover:underline flex items-center gap-0.5">
                   View all <HiChevronRight size={12} />
                 </button>
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+              <div className="flex gap-3 overflow-x-auto pb-2 pr-4 scroll-smooth touch-pan-x select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {featuredItems.filter(i => i.featured).map(item => (
                   <motion.button
                     key={item.id}

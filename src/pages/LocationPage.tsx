@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { HiArrowLeft, HiChevronRight } from 'react-icons/hi';
+import { HiArrowLeft, HiChevronRight, HiChevronLeft } from 'react-icons/hi';
 import { MdPets, MdPark, MdAccountBalance, MdRestaurant, MdHotel, MdDirectionsWalk, MdOutlinePlace } from 'react-icons/md';
 import { GiBirdCage, GiCampingTent } from 'react-icons/gi';
 import { TbLeaf } from 'react-icons/tb';
@@ -28,6 +28,8 @@ export default function LocationPage() {
   const [items,      setItems]      = useState<Item[]>([]);
   const [activeCat,  setActiveCat]  = useState<number | null>(null);
   const [error,      setError]      = useState(false);
+  const [page,       setPage]       = useState(1);
+  const PAGE_SIZE = 9;
 
   useEffect(() => {
     if (!slug) return;
@@ -37,8 +39,8 @@ export default function LocationPage() {
 
   useEffect(() => {
     if (!location) return;
-    fetchItems({ locationId: location.id, categoryId: activeCat ?? undefined, limit: 50 })
-      .then(r => setItems(r.data)).catch(() => null);
+    fetchItems({ locationId: location.id, categoryId: activeCat ?? undefined, limit: 200 })
+      .then(r => { setItems(r.data); setPage(1); }).catch(() => null);
   }, [location, activeCat]);
 
   if (error) return (
@@ -133,36 +135,55 @@ export default function LocationPage() {
         </div>
 
         {/* Items grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pb-10">
-          {items.map(item => (
-            <motion.button
-              key={item.id}
-              whileHover={{ y: -4 }}
-              transition={{ type: 'spring', stiffness: 300 }}
-              onClick={() => navigate(`/items/${item.slug}`)}
-              className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm text-left group"
-            >
-              {item.media[0]
-                ? <img src={item.media[0].url} alt={item.name} className="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-500" />
-                : <div className="w-full h-28 bg-blue-50 flex items-center justify-center text-blue-300">
-                    {CAT_ICON[item.category.slug] ?? <MdOutlinePlace size={28} />}
+        {(() => {
+          const totalPages = Math.ceil(items.length / PAGE_SIZE);
+          const paged = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+          return (
+            <div className="pb-10">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {paged.map(item => (
+                  <motion.button
+                    key={item.id}
+                    whileHover={{ y: -4 }}
+                    transition={{ type: 'spring', stiffness: 300 }}
+                    onClick={() => navigate(`/items/${item.slug}`)}
+                    className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm text-left group"
+                  >
+                    {item.media[0]
+                      ? <img src={item.media[0].url} alt={item.name} className="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-500" />
+                      : <div className="w-full h-28 bg-blue-50 flex items-center justify-center text-blue-300">
+                          {CAT_ICON[item.category.slug] ?? <MdOutlinePlace size={28} />}
+                        </div>
+                    }
+                    <div className="p-3">
+                      <p className="font-bold text-slate-800 text-sm line-clamp-1">{item.name}</p>
+                      <p className="text-xs text-slate-400 capitalize mt-0.5">{item.category.name}</p>
+                      <p className="flex items-center gap-0.5 text-xs text-blue-500 mt-1.5 font-medium">View <HiChevronRight size={12} /></p>
+                    </div>
+                  </motion.button>
+                ))}
+                {items.length === 0 && (
+                  <div className="col-span-2 sm:col-span-3 text-center py-12 text-slate-400 text-sm">
+                    No features added yet for this destination.
                   </div>
-              }
-              <div className="p-3">
-                <p className="font-bold text-slate-800 text-sm line-clamp-1">{item.name}</p>
-                <p className="text-xs text-slate-400 capitalize mt-0.5">{item.category.name}</p>
-                <p className="flex items-center gap-0.5 text-xs text-blue-500 mt-1.5 font-medium">
-                  View <HiChevronRight size={12} />
-                </p>
+                )}
               </div>
-            </motion.button>
-          ))}
-          {items.length === 0 && (
-            <div className="col-span-2 sm:col-span-3 text-center py-12 text-slate-400 text-sm">
-              No features added yet for this destination.
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-3 mt-6">
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                    className="p-2 rounded-xl border border-slate-200 bg-white disabled:opacity-30 hover:border-blue-300 transition">
+                    <HiChevronLeft size={16} className="text-slate-600" />
+                  </button>
+                  <span className="text-sm text-slate-500">{page} / {totalPages}</span>
+                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                    className="p-2 rounded-xl border border-slate-200 bg-white disabled:opacity-30 hover:border-blue-300 transition">
+                    <HiChevronRight size={16} className="text-slate-600" />
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
       </div>
 
       <Footer />

@@ -3,7 +3,7 @@ import {
   HiOutlineLockClosed, HiOutlineUser, HiEye, HiEyeOff,
   HiOutlineLogout, HiOutlinePencil, HiOutlineTrash, HiOutlinePlus,
   HiChevronLeft, HiChevronRight, HiOutlinePhotograph, HiOutlineMusicNote,
-  HiOutlineFilm, HiOutlineLocationMarker, HiCheckCircle, HiXCircle,
+  HiOutlineFilm, HiOutlineLocationMarker, HiCheckCircle, HiXCircle, HiOutlineTag,
 } from 'react-icons/hi';
 import { MdNfc, MdQrCode, MdPets, MdPark, MdAccountBalance, MdOutlinePlace } from 'react-icons/md';
 import { GiBirdCage } from 'react-icons/gi';
@@ -22,7 +22,7 @@ type Tab = 'locations' | 'categories' | 'items' | 'objects';
 
 const TAB_CONFIG: { key: Tab; label: string; icon: JSX.Element }[] = [
   { key: 'locations',  label: 'Destinations', icon: <TbMapPin size={16} />        },
-  { key: 'categories', label: 'Categories',   icon: <MdPark size={16} />           },
+  { key: 'categories', label: 'Categories',   icon: <HiOutlineTag size={16} />         },
   { key: 'items',      label: 'Features',     icon: <MdOutlinePlace size={16} />   },
   { key: 'objects',    label: 'NFC Objects',  icon: <MdNfc size={16} />            },
 ];
