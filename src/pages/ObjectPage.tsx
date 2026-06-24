@@ -7,14 +7,16 @@ import {
 } from 'react-icons/hi';
 import { MdPets, MdPark, MdAccountBalance, MdOutlinePlace } from 'react-icons/md';
 import { GiBirdCage } from 'react-icons/gi';
+import { motion, AnimatePresence } from 'framer-motion';
+
 import LanguageSelector from '../components/common/LanguageSelector';
 import { fetchObject, fetchByNfc, fetchByQr, fetchNearby, type TourObject } from '../services/objectService';
 
 const TYPE_ICON: Record<string, JSX.Element> = {
-  animal:   <MdPets size={16} />,
-  bird:     <GiBirdCage size={16} />,
-  tree:     <MdPark size={16} />,
-  landmark: <MdAccountBalance size={16} />,
+  animal:   <MdPets />,
+  bird:     <GiBirdCage />,
+  tree:     <MdPark />,
+  landmark: <MdAccountBalance />,
 };
 
 const TYPE_LABEL: Record<string, Record<string, string>> = {
@@ -22,13 +24,6 @@ const TYPE_LABEL: Record<string, Record<string, string>> = {
   bird:     { en: 'Bird',     fr: 'Oiseau',   rw: 'Inyoni' },
   tree:     { en: 'Tree',     fr: 'Arbre',    rw: 'Igiti' },
   landmark: { en: 'Landmark', fr: 'Monument', rw: 'Akaranga' },
-};
-
-const FUN_FACTS: Record<string, string> = {
-  animal:   'Animals in this park are protected under national conservation law.',
-  bird:     'Birds play a vital role in seed dispersal and ecosystem balance.',
-  tree:     'Trees absorb CO₂ and produce oxygen for hundreds of living organisms.',
-  landmark: 'Cultural landmarks preserve the history and identity of a community.',
 };
 
 export default function ObjectPage() {
@@ -51,12 +46,12 @@ export default function ObjectPage() {
                   : null;
         if (!obj) throw new Error();
         setObject(obj);
-        fetchNearby(obj.latitude, obj.longitude, 300)
+        fetchNearby(obj.latitude, obj.longitude, 500)
           .then(list => setNearby(list.filter(n => n.id !== obj.id).slice(0, 4)))
           .catch(() => null);
       } catch { setError(t('notFound')); }
     })();
-  }, [id, nfcId, qrCode]);
+  }, [id, nfcId, qrCode, t]);
 
   const toggleAudio = () => {
     if (!audioRef.current) return;
@@ -66,123 +61,122 @@ export default function ObjectPage() {
 
   const lang = ['en', 'fr', 'rw'].includes(i18n.language) ? i18n.language : 'en';
 
-  if (error) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-6 text-center gap-4">
-      <MdOutlinePlace size={40} className="text-slate-200" />
-      <p className="text-slate-500 text-sm">{error}</p>
-      <button onClick={() => navigate('/')} className="text-blue-500 text-sm underline">{t('backToHome')}</button>
-    </div>
-  );
-
-  if (!object) return (
+  if (!object && !error) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+      <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
-  const typeLabel = TYPE_LABEL[object.type]?.[lang] ?? object.type;
-  const funFact   = FUN_FACTS[object.type] ?? FUN_FACTS.landmark;
+  const typeLabel = object ? (TYPE_LABEL[object.type]?.[lang] ?? object.type) : '';
 
   return (
-    <div className="min-h-screen bg-white max-w-lg mx-auto flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center">
+      <div className="w-full max-w-2xl bg-white min-h-screen shadow-modern overflow-hidden flex flex-col">
+        
+        {/* Header Image */}
+        <div className="relative h-96 flex-shrink-0">
+          <img 
+            src={object?.imageUrl || 'https://picsum.photos/800/800?nature'} 
+            alt={object?.name} 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+          
+          <div className="absolute top-6 left-6 right-6 flex justify-between items-center">
+             <button onClick={() => navigate(-1)} className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white hover:bg-white hover:text-slate-900 transition-all">
+                <HiArrowLeft size={24} />
+             </button>
+             <LanguageSelector />
+          </div>
 
-      {/* Hero image */}
-      <div className="relative flex-shrink-0">
-        {object.imageUrl
-          ? <img src={object.imageUrl} alt={object.name} className="w-full h-72 object-cover" />
-          : <div className="w-full h-72 bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center">
-              <MdOutlinePlace size={56} className="text-slate-200" />
+          <div className="absolute bottom-8 left-8 right-8 space-y-3">
+             <div className="flex items-center gap-2">
+               <span className="bg-primary text-slate-900 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-lg">
+                 {object && TYPE_ICON[object.type]} {typeLabel}
+               </span>
+             </div>
+             <h1 className="text-4xl md:text-5xl font-headings font-extrabold text-white tracking-tighter drop-shadow-lg">
+               {object?.name}
+             </h1>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-8 lg:p-12 space-y-12">
+          
+          <div className="space-y-6">
+            <div className="flex items-center gap-6 py-4 border-y border-gray-100">
+               <div className="flex items-center gap-2 text-gray-400 font-bold text-xs uppercase tracking-widest">
+                  <HiLocationMarker className="text-primary-dark" size={18} />
+                  <span>{object?.latitude.toFixed(4)}°N, {object?.longitude.toFixed(4)}°E</span>
+               </div>
             </div>
-        }
-        <button onClick={() => navigate(-1)}
-          className="absolute top-4 left-4 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center">
-          <HiArrowLeft size={18} />
-        </button>
-        <div className="absolute top-4 right-4">
-          <LanguageSelector />
-        </div>
-        <span className="absolute bottom-4 left-4 flex items-center gap-1.5 text-xs font-semibold bg-black/40 backdrop-blur-sm text-white px-3 py-1.5 rounded-full capitalize">
-          {TYPE_ICON[object.type] ?? <MdOutlinePlace size={14} />}
-          {typeLabel}
-        </span>
-      </div>
+            <p className="text-gray-500 text-lg leading-relaxed">
+              {object?.description}
+            </p>
+          </div>
 
-      {/* Content */}
-      <div className="flex-1 px-5 py-6 space-y-6">
-
-        {/* Title */}
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 leading-tight">{object.name}</h1>
-          <p className="flex items-center gap-1 text-xs text-slate-400 mt-1.5">
-            <HiLocationMarker size={13} />
-            {object.latitude.toFixed(4)}, {object.longitude.toFixed(4)}
-          </p>
-        </div>
-
-        {/* Type pill */}
-        <div className="flex flex-wrap gap-2">
-          <span className="flex items-center gap-1.5 text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full font-medium">
-            {TYPE_ICON[object.type]} {typeLabel}
-          </span>
-        </div>
-
-        {/* Description */}
-        <p className="text-slate-600 text-sm leading-relaxed">{object.description}</p>
-
-        {/* Narration button */}
-        {object.audioUrl && (
-          <div>
-            <button onClick={toggleAudio}
-              className={`flex items-center gap-3 w-full px-5 py-4 rounded-2xl border transition active:scale-95 ${
-                playing
-                  ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-200'
-                  : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50'
-              }`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${playing ? 'bg-white/20' : 'bg-blue-50'}`}>
-                {playing ? <HiVolumeUp size={20} /> : <HiVolumeOff size={20} />}
+          {object?.audioUrl && (
+            <button 
+              onClick={toggleAudio}
+              className={`flex items-center gap-5 w-full p-6 rounded-[32px] border-2 transition-all active:scale-95 shadow-xl ${
+                playing ? 'bg-primary border-primary text-slate-900' : 'bg-white border-gray-100 text-slate-700 hover:border-primary'
+              }`}
+            >
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${playing ? 'bg-black/10' : 'bg-primary/10 text-primary-dark'}`}>
+                {playing ? <HiVolumeUp size={28} /> : <HiVolumeOff size={28} />}
               </div>
-              <div className="text-left">
-                <p className="text-sm font-semibold">{playing ? t('pauseNarration') : t('listenNarration')}</p>
-                <p className={`text-xs mt-0.5 ${playing ? 'text-blue-100' : 'text-slate-400'}`}>
-                  {playing ? 'Playing audio guide…' : 'Tap to hear the audio guide'}
+              <div className="text-left flex-grow">
+                <p className="text-lg font-headings font-bold leading-tight">{playing ? 'Guide Playing' : 'Experience the Narrative'}</p>
+                <p className="text-xs font-bold uppercase tracking-widest opacity-60 mt-1">
+                  {playing ? 'Immersive Audio Guide' : 'Tap to hear the story'}
                 </p>
               </div>
+              <audio ref={audioRef} src={object.audioUrl} onEnded={() => setPlaying(false)} />
             </button>
-            <audio ref={audioRef} src={object.audioUrl} onEnded={() => setPlaying(false)} />
-          </div>
-        )}
+          )}
 
-        {/* Nearby attractions */}
-        {nearby.length > 0 && (
-          <div>
-            <h2 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-              <HiLocationMarker size={15} className="text-blue-400" />
-              {t('nearbyAttractions')}
-            </h2>
-            <div className="space-y-2">
-              {nearby.map(n => (
-                <button key={n.id} onClick={() => navigate(`/object/${n.id}`)}
-                  className="w-full flex items-center gap-3 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-100 rounded-2xl px-4 py-3 transition text-left">
-                  <div className="w-9 h-9 rounded-xl bg-white border border-slate-100 flex items-center justify-center flex-shrink-0 text-blue-400">
-                    {TYPE_ICON[n.type] ?? <MdOutlinePlace size={16} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-700 truncate">{n.name}</p>
-                    <p className="text-xs text-slate-400 capitalize">{TYPE_LABEL[n.type]?.[lang] ?? n.type}</p>
-                  </div>
-                  <HiChevronRight size={16} className="text-slate-300 flex-shrink-0" />
-                </button>
-              ))}
+          {/* Nearby Section */}
+          {nearby.length > 0 && (
+            <div className="space-y-8">
+               <h3 className="text-2xl font-headings font-extrabold text-slate-900 italic tracking-tighter border-l-4 border-primary pl-4">
+                 Discover Nearby
+               </h3>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 {nearby.map(n => (
+                   <motion.button 
+                     key={n.id}
+                     whileHover={{ y: -4 }}
+                     onClick={() => navigate(`/object/${n.id}`)}
+                     className="flex items-center gap-4 bg-gray-50 hover:bg-white border border-transparent hover:border-gray-100 p-4 rounded-3xl transition-all shadow-sm hover:shadow-modern text-left group"
+                   >
+                     <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-primary-dark shadow-sm group-hover:bg-primary transition-colors">
+                        {TYPE_ICON[n.type] || <MdOutlinePlace size={24} />}
+                     </div>
+                     <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-900 truncate">{n.name}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{TYPE_LABEL[n.type]?.[lang] ?? n.type}</p>
+                     </div>
+                   </motion.button>
+                 ))}
+               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Fun fact */}
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-4 flex gap-3">
-          <HiLightBulb size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs font-bold text-blue-600 mb-1">{t('funFacts')}</p>
-            <p className="text-sm text-slate-600 leading-relaxed">{funFact}</p>
+          {/* Fact Card */}
+          <div className="bg-dark rounded-[40px] p-8 text-white relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-primary/20 transition-all" />
+            <div className="relative z-10 flex gap-6">
+              <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-slate-900 flex-shrink-0">
+                <HiLightBulb size={24} />
+              </div>
+              <div className="space-y-2">
+                <p className="text-primary font-headings font-bold text-xs uppercase tracking-widest">Digital Insights</p>
+                <p className="text-gray-300 leading-relaxed italic">
+                  "Every stone and leaf in this sanctuary tells a story of survival and heritage. Our digital guides help you listen."
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 

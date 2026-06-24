@@ -71,29 +71,47 @@ export const fetchItem = (slug: string): Promise<Item> =>
 // Admin CRUD
 const authHeader = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-export const adminCreateLocation = (fd: FormData, token: string) =>
-  axios.post(`${API}/locations`, fd, { headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+export const adminCreateLocation = (fd: FormData, token: string, onProgress?: (p: number) => void) =>
+  axios.post(`${API}/locations`, fd, {
+    headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
+  }).then(r => r.data);
 
-export const adminUpdateLocation = (id: number, fd: FormData, token: string) =>
-  axios.put(`${API}/locations/${id}`, fd, { headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+export const adminUpdateLocation = (id: number, fd: FormData, token: string, onProgress?: (p: number) => void) =>
+  axios.put(`${API}/locations/${id}`, fd, {
+    headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
+  }).then(r => r.data);
 
 export const adminDeleteLocation = (id: number, token: string) =>
   axios.delete(`${API}/locations/${id}`, { headers: authHeader(token) }).then(r => r.data);
 
-export const adminCreateCategory = (fd: FormData, token: string) =>
-  axios.post(`${API}/categories`, fd, { headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+export const adminCreateCategory = (fd: FormData, token: string, onProgress?: (p: number) => void) =>
+  axios.post(`${API}/categories`, fd, {
+    headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
+  }).then(r => r.data);
 
-export const adminUpdateCategory = (id: number, fd: FormData, token: string) =>
-  axios.put(`${API}/categories/${id}`, fd, { headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+export const adminUpdateCategory = (id: number, fd: FormData, token: string, onProgress?: (p: number) => void) =>
+  axios.put(`${API}/categories/${id}`, fd, {
+    headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
+  }).then(r => r.data);
 
 export const adminDeleteCategory = (id: number, token: string) =>
   axios.delete(`${API}/categories/${id}`, { headers: authHeader(token) }).then(r => r.data);
 
-export const adminCreateItem = (fd: FormData, token: string) =>
-  axios.post(`${API}/items`, fd, { headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+export const adminCreateItem = (fd: FormData, token: string, onProgress?: (p: number) => void) =>
+  axios.post(`${API}/items`, fd, {
+    headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
+  }).then(r => r.data);
 
-export const adminUpdateItem = (id: number, fd: FormData, token: string) =>
-  axios.put(`${API}/items/${id}`, fd, { headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+export const adminUpdateItem = (id: number, fd: FormData, token: string, onProgress?: (p: number) => void) =>
+  axios.put(`${API}/items/${id}`, fd, {
+    headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
+  }).then(r => r.data);
 
 export const adminDeleteItem = (id: number, token: string) =>
   axios.delete(`${API}/items/${id}`, { headers: authHeader(token) }).then(r => r.data);

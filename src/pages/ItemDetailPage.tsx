@@ -1,35 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Navigation, Pagination } from 'swiper/modules';
+import { Navigation, Pagination, EffectCreative } from 'swiper/modules';
+import {
+  HiHeart, HiOutlineHeart, HiVolumeUp, HiVolumeOff,
+  HiPlay, HiLocationMarker, HiStar
+} from 'react-icons/hi';
+import { MdOutlinePlace } from 'react-icons/md';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
-import {
-  HiArrowLeft, HiHeart, HiOutlineHeart, HiChevronRight,
-  HiVolumeUp, HiVolumeOff, HiPlay,
-} from 'react-icons/hi';
-import { MdPets, MdPark, MdAccountBalance, MdRestaurant, MdHotel, MdDirectionsWalk, MdOutlinePlace } from 'react-icons/md';
-import { GiBirdCage, GiCampingTent } from 'react-icons/gi';
-import { TbLeaf, TbClock } from 'react-icons/tb';
-import { useRef } from 'react';
+
 import { fetchItem, type Item } from '../services/tourismService';
-import { Footer } from './HomePage';
 
 type Tab = 'overview' | 'habitat' | 'conservation' | 'facts';
-
-const CAT_ICON: Record<string, JSX.Element> = {
-  animals:     <MdPets size={20} />,
-  birds:       <GiBirdCage size={20} />,
-  forests:     <MdPark size={20} />,
-  plants:      <TbLeaf size={20} />,
-  camping:     <GiCampingTent size={20} />,
-  hotels:      <MdHotel size={20} />,
-  restaurants: <MdRestaurant size={20} />,
-  activities:  <MdDirectionsWalk size={20} />,
-  attractions: <MdAccountBalance size={20} />,
-};
 
 function AudioBtn({ src }: { src: string }) {
   const ref = useRef<HTMLAudioElement>(null);
@@ -41,16 +26,16 @@ function AudioBtn({ src }: { src: string }) {
   };
   return (
     <button onClick={toggle}
-      className={`flex items-center gap-3 w-full px-5 py-4 rounded-2xl border transition active:scale-95 ${
-        playing ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50'
+      className={`flex items-center gap-4 w-full p-6 rounded-3xl border-2 transition-all active:scale-95 shadow-lg ${
+        playing ? 'bg-primary border-primary text-slate-900' : 'bg-white border-gray-100 text-slate-700 hover:border-primary'
       }`}>
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${playing ? 'bg-white/20' : 'bg-blue-50'}`}>
-        {playing ? <HiVolumeUp size={20} /> : <HiVolumeOff size={20} />}
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${playing ? 'bg-black/10' : 'bg-primary/10 text-primary-dark'}`}>
+        {playing ? <HiVolumeUp size={24} /> : <HiVolumeOff size={24} />}
       </div>
-      <div className="text-left">
-        <p className="text-sm font-semibold">{playing ? 'Pause Narration' : 'Listen to Narration'}</p>
-        <p className={`text-xs mt-0.5 ${playing ? 'text-blue-100' : 'text-slate-400'}`}>
-          {playing ? 'Playing audio guide…' : 'Tap to hear the audio guide'}
+      <div className="text-left flex-grow">
+        <p className="text-base font-headings font-bold">{playing ? 'Currently Listening' : 'Audio Narrative Guide'}</p>
+        <p className="text-xs font-medium uppercase tracking-widest mt-1 opacity-60">
+          {playing ? 'Experience the story...' : 'Tap to play audio guide'}
         </p>
       </div>
       <audio ref={ref} src={src} onEnded={() => setPlaying(false)} />
@@ -61,17 +46,26 @@ function AudioBtn({ src }: { src: string }) {
 export default function ItemDetailPage() {
   const { slug }  = useParams<{ slug: string }>();
   const navigate  = useNavigate();
-  const [item,  setItem]  = useState<Item | null>(null);
-  const [tab,   setTab]   = useState<Tab>('overview');
-  const [error, setError] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [item,       setItem]       = useState<Item | null>(null);
+  const [tab,        setTab]        = useState<Tab>('overview');
+  const [ready,      setReady]      = useState(false);
+  const [saved,      setSaved]      = useState(false);
+  const [userRating, setUserRating] = useState(0);
+  const [hoverStar,  setHoverStar]  = useState(0);
 
   useEffect(() => {
     if (!slug) return;
-    fetchItem(slug).then(setItem).catch(() => setError(true));
+    fetchItem(slug).then(res => {
+      setItem(res);
+      setReady(true);
+    }).catch(() => navigate('/'));
+
     const favs: string[] = JSON.parse(localStorage.getItem('favourites') ?? '[]');
     setSaved(favs.includes(slug));
-  }, [slug]);
+
+    const savedRating = localStorage.getItem(`rating_${slug}`);
+    if (savedRating) setUserRating(Number(savedRating));
+  }, [slug, navigate]);
 
   const toggleFav = () => {
     const favs: string[] = JSON.parse(localStorage.getItem('favourites') ?? '[]');
@@ -80,17 +74,14 @@ export default function ItemDetailPage() {
     setSaved(!saved);
   };
 
-  if (error) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
-      <MdOutlinePlace size={48} className="text-blue-100" />
-      <p className="text-slate-500">Item not found.</p>
-      <button onClick={() => navigate(-1)} className="text-blue-500 text-sm underline">Go back</button>
-    </div>
-  );
+  const handleRate = (star: number) => {
+    setUserRating(star);
+    localStorage.setItem(`rating_${slug}`, String(star));
+  };
 
-  if (!item) return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+  if (!ready || !item) return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+      <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
@@ -102,145 +93,184 @@ export default function ItemDetailPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-2xl mx-auto">
+    <div className="bg-white pb-24">
+      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
 
-        {/* Sticky header */}
-        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-blue-50 px-5 py-3.5 flex items-center justify-between shadow-sm">
-          <button onClick={() => navigate(-1)}
-            className="w-9 h-9 rounded-2xl bg-blue-50 hover:bg-blue-100 flex items-center justify-center text-blue-500 transition">
-            <HiArrowLeft size={18} />
-          </button>
-          <span className="font-bold text-slate-800 text-sm truncate mx-3 flex-1">{item.name}</span>
-          <button onClick={toggleFav}
-            className="w-9 h-9 rounded-2xl bg-blue-50 hover:bg-blue-100 flex items-center justify-center transition">
-            {saved
-              ? <HiHeart size={18} className="text-blue-500" />
-              : <HiOutlineHeart size={18} className="text-slate-400" />
-            }
-          </button>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
 
-        {/* Image slider — left to right */}
-        {item.media.length > 0 ? (
-          <Swiper
-            modules={[Navigation, Pagination]}
-            navigation
-            pagination={{ clickable: true }}
-            speed={600}
-            slidesPerView={1}
-            className="w-full"
-            style={{ height: '280px' }}
-          >
-            {item.media.map(m => (
-              <SwiperSlide key={m.id}>
-                {m.type === 'video'
-                  ? <video src={m.url} controls className="w-full h-full object-cover" />
-                  : <img src={m.url} alt={m.caption ?? item.name} className="w-full h-full object-cover" />
-                }
-              </SwiperSlide>
-            ))}
-          </Swiper>
-        ) : (
-          <div className="w-full h-64 bg-blue-50 flex items-center justify-center text-blue-200">
-            {CAT_ICON[item.category.slug] ?? <MdOutlinePlace size={48} />}
-          </div>
-        )}
+          {/* Media Section */}
+          <div className="space-y-8">
+            <div className="rounded-[40px] overflow-hidden shadow-modern relative group">
+              <button
+                onClick={toggleFav}
+                className="absolute top-6 right-6 z-20 w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white hover:bg-white transition-all hover:text-accent"
+              >
+                {saved ? <HiHeart size={24} className="text-accent" /> : <HiOutlineHeart size={24} />}
+              </button>
 
-        <div className="px-5 py-6 space-y-6">
-
-          {/* Title block */}
-          <div className="bg-blue-50 rounded-3xl px-5 py-4">
-            <div className="flex items-center gap-2 text-blue-500 mb-2">
-              {CAT_ICON[item.category.slug] ?? <MdOutlinePlace size={18} />}
-              <span className="text-xs font-semibold uppercase tracking-wider">{item.category.name} · {item.location.name}</span>
+              {item.media.length > 0 ? (
+                <Swiper
+                  modules={[Navigation, Pagination, EffectCreative]}
+                  navigation
+                  pagination={{ clickable: true }}
+                  effect="creative"
+                  creativeEffect={{
+                    prev: { shadow: true, translate: [0, 0, -400] },
+                    next: { translate: ['100%', 0, 0] },
+                  }}
+                  className="w-full aspect-[4/3] lg:aspect-square"
+                >
+                  {item.media.map(m => (
+                    <SwiperSlide key={m.id}>
+                      <img src={m.url} alt={m.caption ?? item.name} className="w-full h-full object-cover" />
+                    </SwiperSlide>
+                  ))}
+                </Swiper>
+              ) : (
+                <div className="w-full aspect-square bg-gray-50 flex items-center justify-center text-gray-200">
+                  <MdOutlinePlace size={80} />
+                </div>
+              )}
             </div>
-            <h1 className="text-2xl font-bold text-slate-800 leading-tight">{item.name}</h1>
-            {item.duration && (
-              <p className="flex items-center gap-1.5 text-xs text-slate-500 mt-2">
-                <TbClock size={13} /> {item.duration}
-              </p>
-            )}
-            {item.rating > 0 && (
-              <p className="flex items-center gap-1 text-xs text-amber-500 mt-1.5 font-semibold">
-                {'⭐'.repeat(Math.round(item.rating))} {item.rating.toFixed(1)} / 5
-              </p>
+
+            {item.audioUrl && <AudioBtn src={item.audioUrl} />}
+
+            {item.videoUrl && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <HiPlay className="text-primary-dark" size={24} />
+                  <h3 className="font-headings font-bold text-lg">Cinematic Experience</h3>
+                </div>
+                <div className="rounded-[32px] overflow-hidden shadow-lg border border-gray-100">
+                  <video src={item.videoUrl} controls className="w-full" />
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Audio narration */}
-          {item.audioUrl && <AudioBtn src={item.audioUrl} />}
+          {/* Content Section */}
+          <div className="space-y-10 lg:sticky lg:top-32">
+            <div className="space-y-6">
+              <div className="flex flex-wrap gap-2">
+                <span className="bg-primary/20 text-primary-dark text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest italic border border-primary/30">
+                  {item.category.name}
+                </span>
+                <span className="bg-gray-50 text-gray-400 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest border border-gray-100">
+                  Top Rated
+                </span>
+              </div>
 
-          {/* Overview video */}
-          {item.videoUrl && (
-            <div>
-              <p className="flex items-center gap-2 text-sm font-bold text-slate-800 mb-3">
-                <HiPlay size={16} className="text-blue-500" /> Video Overview
-              </p>
-              <video src={item.videoUrl} controls className="w-full rounded-3xl border border-slate-100 shadow-sm" />
-            </div>
-          )}
+              <h1 className="text-5xl md:text-6xl font-headings font-extrabold text-slate-900 tracking-tighter leading-tight">
+                {item.name}
+              </h1>
 
-          {/* Tabs */}
-          <div>
-            <div className="flex bg-blue-50 rounded-2xl p-1 gap-1 mb-5">
-              {tabs.map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-xl transition ${
-                    tab === t.key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >{t.label}</button>
-              ))}
-            </div>
-            <motion.div
-              key={tab}
-              initial={{ opacity: 0, x: 12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2 }}
-              className="text-slate-600 text-sm leading-relaxed bg-white rounded-3xl border border-slate-100 px-5 py-4 min-h-[80px]"
-            >
-              {tab === 'overview'     && <p>{item.description}</p>}
-              {tab === 'habitat'      && <p>{item.habitat      ?? 'No habitat information available.'}</p>}
-              {tab === 'conservation' && <p>{item.conservation ?? 'No conservation information available.'}</p>}
-              {tab === 'facts'        && <p style={{ whiteSpace: 'pre-line' }}>{item.facts ?? 'No facts available.'}</p>}
-            </motion.div>
-          </div>
+              <div className="flex flex-wrap items-center gap-8 py-4 border-y border-gray-100">
+                {/* Interactive star rating */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button
+                        key={star}
+                        onMouseEnter={() => setHoverStar(star)}
+                        onMouseLeave={() => setHoverStar(0)}
+                        onClick={() => handleRate(star)}
+                        className="transition-transform hover:scale-125 active:scale-95"
+                      >
+                        <HiStar
+                          size={24}
+                          className={star <= (hoverStar || userRating) ? 'text-primary-dark' : 'text-gray-200'}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    {userRating > 0 ? `Your rating: ${userRating}/5` : 'Tap to rate'}
+                    {item.rating > 0 && ` · Avg ${item.rating.toFixed(1)}`}
+                  </span>
+                </div>
 
-          {/* Related items */}
-          {item.related && item.related.length > 0 && (
-            <div className="pb-8">
-              <p className="text-base font-bold text-slate-800 mb-4">You May Also Like</p>
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {item.related.map(r => (
-                  <motion.button
-                    key={r.id}
-                    whileHover={{ y: -3 }}
-                    onClick={() => navigate(`/items/${r.slug}`)}
-                    className="flex-shrink-0 w-36 bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm text-left"
-                  >
-                    {r.media[0]
-                      ? <img src={r.media[0].url} alt={r.name} className="w-full h-24 object-cover" />
-                      : <div className="w-full h-24 bg-blue-50 flex items-center justify-center text-blue-200">
-                          {CAT_ICON[r.category.slug] ?? <MdOutlinePlace size={24} />}
-                        </div>
-                    }
-                    <div className="p-3">
-                      <p className="text-xs font-semibold text-slate-800 line-clamp-2">{r.name}</p>
-                      <p className="flex items-center gap-0.5 text-xs text-blue-500 mt-1">
-                        View <HiChevronRight size={11} />
-                      </p>
-                    </div>
-                  </motion.button>
-                ))}
+                <div className="flex items-center gap-2 text-gray-400">
+                  <HiLocationMarker size={20} />
+                  <span className="font-bold">{item.location.name}</span>
+                </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      <Footer />
+            <div className="space-y-8">
+              <div className="flex border-b border-gray-100">
+                {tabs.map(t => (
+                  <button
+                    key={t.key}
+                    onClick={() => setTab(t.key)}
+                    className={`px-6 py-4 text-sm font-bold transition-all relative ${
+                      tab === t.key ? 'text-slate-900' : 'text-gray-400 hover:text-slate-600'
+                    }`}
+                  >
+                    {t.label}
+                    {tab === t.key && (
+                      <motion.div layoutId="itemTab" className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={tab}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="text-gray-500 text-lg leading-relaxed"
+                >
+                  {tab === 'overview'     && <p>{item.description}</p>}
+                  {tab === 'habitat'      && <p>{item.habitat      || 'Deep within the lush forests of Rwanda.'}</p>}
+                  {tab === 'conservation' && <p>{item.conservation || 'Protected with utmost care by RDB.'}</p>}
+                  {tab === 'facts'        && <p className="whitespace-pre-line">{item.facts || 'Known for its incredible intelligence and beauty.'}</p>}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <button
+                onClick={toggleFav}
+                className={`w-full border-2 rounded-3xl py-4 flex items-center justify-center gap-2 font-bold transition-all shadow-sm ${
+                  saved ? 'bg-accent border-accent text-white' : 'border-gray-100 text-slate-900 hover:bg-gray-50'
+                }`}
+              >
+                {saved ? <HiHeart size={24} /> : <HiOutlineHeart size={24} />}
+                {saved ? 'Saved to Favorites' : 'Add to Favorites'}
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Related Section */}
+        {item.related && item.related.length > 0 && (
+          <section className="mt-32 space-y-12">
+            <h3 className="text-3xl font-headings font-extrabold text-slate-900 italic tracking-tighter">You May Also Like</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {item.related.map(r => (
+                <motion.div
+                  key={r.id}
+                  whileHover={{ y: -5 }}
+                  onClick={() => navigate(`/items/${r.slug}`)}
+                  className="bg-white border border-gray-100 rounded-[32px] overflow-hidden shadow-sm hover:shadow-modern transition-all cursor-pointer group"
+                >
+                  <div className="h-48 overflow-hidden">
+                    <img src={r.media[0]?.url || 'https://picsum.photos/400/400?nature'} alt={r.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  </div>
+                  <div className="p-6">
+                    <h4 className="font-headings font-bold text-slate-900 mb-2">{r.name}</h4>
+                    <p className="text-xs text-primary-dark font-bold uppercase tracking-widest italic">{r.category.name}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+        )}
+
+      </div>
     </div>
   );
 }

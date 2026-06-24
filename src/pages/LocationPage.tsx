@@ -1,192 +1,152 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { HiArrowLeft, HiChevronRight, HiChevronLeft } from 'react-icons/hi';
-import { MdPets, MdPark, MdAccountBalance, MdRestaurant, MdHotel, MdDirectionsWalk, MdOutlinePlace } from 'react-icons/md';
-import { GiBirdCage, GiCampingTent } from 'react-icons/gi';
-import { TbLeaf } from 'react-icons/tb';
-import { fetchLocation, fetchCategories, fetchItems, type Location, type Category, type Item } from '../services/tourismService';
-import { Footer } from './HomePage';
+import { HiLocationMarker } from 'react-icons/hi';
+import { MdAccountBalance } from 'react-icons/md';
 
-const CAT_ICON: Record<string, JSX.Element> = {
-  animals:     <MdPets size={18} />,
-  birds:       <GiBirdCage size={18} />,
-  forests:     <MdPark size={18} />,
-  plants:      <TbLeaf size={18} />,
-  camping:     <GiCampingTent size={18} />,
-  hotels:      <MdHotel size={18} />,
-  restaurants: <MdRestaurant size={18} />,
-  activities:  <MdDirectionsWalk size={18} />,
-  attractions: <MdAccountBalance size={18} />,
-};
+import TripCard from '../components/ui/TripCard';
+import { fetchLocation, fetchCategories, fetchItems, type Location, type Category, type Item } from '../services/tourismService';
 
 export default function LocationPage() {
-  const { slug }   = useParams<{ slug: string }>();
-  const navigate   = useNavigate();
-  const [location,   setLocation]   = useState<Location | null>(null);
+  const { slug }  = useParams<{ slug: string }>();
+  const navigate  = useNavigate();
+  const [location, setLocation] = useState<Location | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [items,      setItems]      = useState<Item[]>([]);
-  const [activeCat,  setActiveCat]  = useState<number | null>(null);
-  const [error,      setError]      = useState(false);
-  const [page,       setPage]       = useState(1);
-  const PAGE_SIZE = 9;
+  const [items, setItems] = useState<Item[]>([]);
+  const [activeCat, setActiveCat] = useState<number | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
-    fetchLocation(slug).then(setLocation).catch(() => setError(true));
-    fetchCategories().then(setCategories).catch(() => null);
-  }, [slug]);
+    const load = async () => {
+      try {
+        const loc = await fetchLocation(slug);
+        const cats = await fetchCategories().catch(() => []);
+        setLocation(loc);
+        setCategories(cats as Category[]);
+        setReady(true);
+      } catch (err) {
+        navigate('/');
+      }
+    };
+    load();
+  }, [slug, navigate]);
 
   useEffect(() => {
     if (!location) return;
-    fetchItems({ locationId: location.id, categoryId: activeCat ?? undefined, limit: 200 })
-      .then(r => { setItems(r.data); setPage(1); }).catch(() => null);
+    fetchItems({ locationId: location.id, categoryId: activeCat ?? undefined, limit: 100 })
+      .then(r => setItems(r.data)).catch(() => null);
   }, [location, activeCat]);
 
-  if (error) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
-      <MdOutlinePlace size={48} className="text-blue-100" />
-      <p className="text-slate-500">Location not found.</p>
-      <button onClick={() => navigate('/')} className="text-blue-500 text-sm underline">Back to home</button>
-    </div>
-  );
-
-  if (!location) return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+  if (!ready || !location) return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+      <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <p className="text-gray-400 font-bold text-xs tracking-widest uppercase">Finding Destination...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-white">
-
-      {/* Sticky nav */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-blue-50 px-5 py-3.5 flex items-center gap-3 shadow-sm">
-        <button
-          onClick={() => navigate('/')}
-          className="w-9 h-9 rounded-2xl bg-blue-50 hover:bg-blue-100 flex items-center justify-center text-blue-500 transition flex-shrink-0">
-          <HiArrowLeft size={18} />
-        </button>
-        <span className="font-bold text-slate-800 truncate">{location.name}</span>
+    <div className="space-y-16 pb-24">
+      {/* ── HERO ── */}
+      <div className="relative h-[450px] w-full overflow-hidden">
+        <img 
+          src={location.coverImage || 'https://picsum.photos/1920/1080?nature'} 
+          alt={location.name} 
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-black/40" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-white px-6">
+           <motion.span 
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             className="text-primary font-headings font-bold text-sm uppercase tracking-widest mb-4"
+           >
+             Rwanda Destination
+           </motion.span>
+           <motion.h1 
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             transition={{ delay: 0.1 }}
+             className="text-6xl md:text-8xl font-headings font-extrabold tracking-tighter text-center"
+           >
+             {location.name}
+           </motion.h1>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-4 bg-primary" />
       </div>
 
-      {/* Cover image */}
-      <div className="pt-[60px]">
-        {location.coverImage
-          ? <div className="relative h-64 overflow-hidden">
-              <img src={location.coverImage} alt={location.name} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-              <div className="absolute bottom-5 left-6">
-                <h1 className="text-white text-2xl font-bold">{location.name}</h1>
+      <div className="max-w-7xl mx-auto px-6 lg:px-10 space-y-24">
+        {/* ── INFO ── */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-16 items-start">
+          <div className="lg:col-span-2 space-y-8">
+            <h2 className="text-3xl font-headings font-extrabold text-slate-900">About {location.name}</h2>
+            <p className="text-gray-500 text-lg leading-relaxed">{location.description}</p>
+            {location.videoUrl && (
+              <div className="rounded-[32px] overflow-hidden shadow-modern border border-gray-100">
+                <video src={location.videoUrl} controls className="w-full" poster={location.coverImage ?? undefined} />
+              </div>
+            )}
+          </div>
+          <div className="bg-gray-50 p-10 rounded-[40px] border border-gray-100 space-y-8 sticky top-32">
+             <div className="space-y-4">
+               <h3 className="font-headings font-extrabold text-xl">Quick Details</h3>
+               <div className="space-y-3">
+                 <div className="flex items-center gap-3 text-gray-600">
+                   <HiLocationMarker className="text-primary-dark" />
+                   <span>Rwanda, East Africa</span>
+                 </div>
+                 <div className="flex items-center gap-3 text-gray-600">
+                   <MdAccountBalance className="text-primary-dark" />
+                <span>{items.length} Attractions</span>
               </div>
             </div>
-          : <div className="h-48 bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
-              <MdPark size={56} className="text-blue-200" />
-            </div>
-        }
-      </div>
-
-      <div className="max-w-3xl mx-auto px-5 py-8 space-y-8">
-
-        {/* Description */}
-        <div className="bg-blue-50 rounded-3xl px-6 py-5">
-          <h2 className="text-lg font-bold text-slate-800 mb-2">{location.name}</h2>
-          <p className="text-slate-600 text-sm leading-relaxed">{location.description}</p>
-        </div>
-
-        {/* Overview video */}
-        {location.videoUrl && (
-          <div>
-            <h3 className="text-base font-bold text-slate-800 mb-3">Overview Video</h3>
-            <video
-              src={location.videoUrl}
-              controls
-              className="w-full rounded-3xl shadow-sm border border-slate-100"
-              poster={location.coverImage ?? undefined}
-            />
           </div>
-        )}
+        </div>
+      </section>
 
-        {/* Category filters */}
-        <div>
-          <h3 className="text-base font-bold text-slate-800 mb-4">Explore Features</h3>
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setActiveCat(null)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-semibold transition ${
-                activeCat === null ? 'bg-blue-500 text-white shadow-sm shadow-blue-200' : 'bg-blue-50 text-slate-600 hover:bg-blue-100'
-              }`}
-            >All</button>
-            {categories.map(cat => (
+        {/* ── FEATURES GRID ── */}
+        <section className="space-y-12">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-gray-100 pb-8">
+            <h3 className="text-3xl font-headings font-extrabold text-slate-900 tracking-tight">Explore Features</h3>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
               <button
-                key={cat.id}
-                onClick={() => setActiveCat(cat.id === activeCat ? null : cat.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-semibold transition ${
-                  activeCat === cat.id ? 'bg-blue-500 text-white shadow-sm shadow-blue-200' : 'bg-blue-50 text-slate-600 hover:bg-blue-100'
+                onClick={() => setActiveCat(null)}
+                className={`px-6 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
+                  activeCat === null ? 'bg-primary text-slate-900 shadow-md' : 'text-gray-400 hover:text-slate-600 hover:bg-gray-100'
                 }`}
-              >
-                <span className={activeCat === cat.id ? 'text-white' : 'text-blue-500'}>
-                  {CAT_ICON[cat.slug] ?? <MdAccountBalance size={18} />}
-                </span>
-                {cat.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Items grid */}
-        {(() => {
-          const totalPages = Math.ceil(items.length / PAGE_SIZE);
-          const paged = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-          return (
-            <div className="pb-10">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {paged.map(item => (
-                  <motion.button
-                    key={item.id}
-                    whileHover={{ y: -4 }}
-                    transition={{ type: 'spring', stiffness: 300 }}
-                    onClick={() => navigate(`/items/${item.slug}`)}
-                    className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm text-left group"
-                  >
-                    {item.media[0]
-                      ? <img src={item.media[0].url} alt={item.name} className="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-500" />
-                      : <div className="w-full h-28 bg-blue-50 flex items-center justify-center text-blue-300">
-                          {CAT_ICON[item.category.slug] ?? <MdOutlinePlace size={28} />}
-                        </div>
-                    }
-                    <div className="p-3">
-                      <p className="font-bold text-slate-800 text-sm line-clamp-1">{item.name}</p>
-                      <p className="text-xs text-slate-400 capitalize mt-0.5">{item.category.name}</p>
-                      <p className="flex items-center gap-0.5 text-xs text-blue-500 mt-1.5 font-medium">View <HiChevronRight size={12} /></p>
-                    </div>
-                  </motion.button>
-                ))}
-                {items.length === 0 && (
-                  <div className="col-span-2 sm:col-span-3 text-center py-12 text-slate-400 text-sm">
-                    No features added yet for this destination.
-                  </div>
-                )}
-              </div>
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-3 mt-6">
-                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                    className="p-2 rounded-xl border border-slate-200 bg-white disabled:opacity-30 hover:border-blue-300 transition">
-                    <HiChevronLeft size={16} className="text-slate-600" />
-                  </button>
-                  <span className="text-sm text-slate-500">{page} / {totalPages}</span>
-                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                    className="p-2 rounded-xl border border-slate-200 bg-white disabled:opacity-30 hover:border-blue-300 transition">
-                    <HiChevronRight size={16} className="text-slate-600" />
-                  </button>
-                </div>
-              )}
+              >All Features</button>
+              {categories.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCat(cat.id)}
+                  className={`px-6 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
+                    activeCat === cat.id ? 'bg-primary text-slate-900 shadow-md' : 'text-gray-400 hover:text-slate-600 hover:bg-gray-100'
+                  }`}
+                >{cat.name}</button>
+              ))}
             </div>
-          );
-        })()}
-      </div>
+          </div>
 
-      <Footer />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {items.map(item => (
+              <TripCard
+                key={item.id}
+                name={item.name}
+                description={item.description}
+                image={item.media[0]?.url}
+                location={location.name}
+                rating={item.rating || undefined}
+                onClick={() => navigate(`/items/${item.slug}`)}
+              />
+            ))}
+            {items.length === 0 && (
+              <div className="col-span-full py-24 text-center text-gray-400 font-bold uppercase tracking-widest bg-gray-50 rounded-[40px] border-2 border-dashed border-gray-200">
+                No features found for this category
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

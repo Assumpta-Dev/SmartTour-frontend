@@ -2,30 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root { height: 100%; margin: 0; padding: 0; }
+@layer base {
+  html, body, #root { 
+    height: 100%; 
+    margin: 0; 
+    padding: 0; 
+    @apply font-sans text-slate-900 bg-white;
+  }
 
-/* Swiper hero card — full height, slides move right to left */
-.hero-swiper {
-  height: 100%;
-  overflow: hidden;
-}
-.hero-swiper .swiper-wrapper {
-  height: 100%;
-  display: flex;
-  flex-direction: row;
-}
-.hero-swiper .swiper-slide {
-  height: 100%;
-  width: 100% !important;
-  flex-shrink: 0;
-  position: relative;
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headings;
+  }
 }
 
-/* Hide scrollbar but keep scroll */
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-gray-50;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-200 rounded-full border-2 border-gray-50;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary;
+}
+
+/* Swiper overrides */
+.swiper-button-next, .swiper-button-prev {
+  @apply !text-primary-dark !w-10 !h-10 bg-white/50 backdrop-blur-md rounded-full after:!text-xl transition-all hover:bg-white;
+}
+
+.swiper-pagination-bullet-active {
+  @apply !bg-primary;
+}
+
+/* Utilities */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-/* Thin scrollbar for location grid */
-.custom-scroll::-webkit-scrollbar { width: 4px; }
-.custom-scroll::-webkit-scrollbar-track { background: transparent; }
-.custom-scroll::-webkit-scrollbar-thumb { background: #bfdbfe; border-radius: 2px; }
