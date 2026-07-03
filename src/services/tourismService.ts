@@ -71,15 +71,44 @@ export const fetchItem = (slug: string): Promise<Item> =>
 // Admin CRUD
 const authHeader = (token: string) => ({ Authorization: `Bearer ${token}` });
 
+// Uploads a video file directly to Cloudinary (bypasses backend/Render timeout).
+// Returns the Cloudinary URL string.
+export async function directUploadToCloudinary(
+  file: File,
+  token: string,
+  folder = 'smart-tourism/videos',
+  onProgress?: (p: number) => void,
+): Promise<string> {
+  const { data: sig } = await axios.get(`${API}/upload/signature`, {
+    headers: authHeader(token),
+    params: { folder, resource_type: 'video' },
+  });
+  const fd = new FormData();
+  fd.append('file',          file);
+  fd.append('api_key',       sig.api_key);
+  fd.append('timestamp',     String(sig.timestamp));
+  fd.append('signature',     sig.signature);
+  fd.append('folder',        sig.folder);
+  fd.append('resource_type', sig.resource_type);
+  const { data } = await axios.post(
+    `https://api.cloudinary.com/v1_1/${sig.cloud_name}/${sig.resource_type}/upload`,
+    fd,
+    { timeout: 0, onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))) },
+  );
+  return data.secure_url;
+}
+
 export const adminCreateLocation = (fd: FormData, token: string, onProgress?: (p: number) => void) =>
   axios.post(`${API}/locations`, fd, {
     headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
     onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
   }).then(r => r.data);
 
 export const adminUpdateLocation = (id: number, fd: FormData, token: string, onProgress?: (p: number) => void) =>
   axios.put(`${API}/locations/${id}`, fd, {
     headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
     onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
   }).then(r => r.data);
 
@@ -89,12 +118,14 @@ export const adminDeleteLocation = (id: number, token: string) =>
 export const adminCreateCategory = (fd: FormData, token: string, onProgress?: (p: number) => void) =>
   axios.post(`${API}/categories`, fd, {
     headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
     onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
   }).then(r => r.data);
 
 export const adminUpdateCategory = (id: number, fd: FormData, token: string, onProgress?: (p: number) => void) =>
   axios.put(`${API}/categories/${id}`, fd, {
     headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
     onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
   }).then(r => r.data);
 
@@ -104,12 +135,14 @@ export const adminDeleteCategory = (id: number, token: string) =>
 export const adminCreateItem = (fd: FormData, token: string, onProgress?: (p: number) => void) =>
   axios.post(`${API}/items`, fd, {
     headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
     onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
   }).then(r => r.data);
 
 export const adminUpdateItem = (id: number, fd: FormData, token: string, onProgress?: (p: number) => void) =>
   axios.put(`${API}/items/${id}`, fd, {
     headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
     onUploadProgress: e => onProgress?.(Math.round((e.loaded * 100) / (e.total ?? 1))),
   }).then(r => r.data);
 

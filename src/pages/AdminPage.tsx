@@ -17,6 +17,7 @@ import {
   adminCreateLocation, adminUpdateLocation, adminDeleteLocation,
   adminCreateCategory, adminUpdateCategory, adminDeleteCategory,
   adminCreateItem, adminUpdateItem, adminDeleteItem,
+  directUploadToCloudinary,
   type Location, type Category, type Item,
 } from '../services/tourismService';
 
@@ -119,15 +120,25 @@ export default function AdminPage() {
       if (longitude)   fd.append('longitude', String(longitude));
       if (featured != null) fd.append('featured', String(featured));
       if (imageFile)   fd.append('image', imageFile);
-      if (videoFile)   fd.append('video', videoFile);
-      else if (videoUrl) fd.append('videoUrl', videoUrl);
+      if (videoFile) {
+        const url = await directUploadToCloudinary(videoFile, token, 'smart-tourism/videos', setUploadProgress);
+        fd.append('videoUrl', url);
+      } else if (videoUrl !== undefined) fd.append('videoUrl', videoUrl);
       editingLoc !== null
-        ? await adminUpdateLocation(editingLoc, fd, token, setUploadProgress)
-        : await adminCreateLocation(fd, token, setUploadProgress);
+        ? await adminUpdateLocation(editingLoc, fd, token)
+        : await adminCreateLocation(fd, token);
       flash('Success');
       setLocForm({}); setEditingLoc(null);
-      fetchLocations().then(setLocations);
-    } catch (e: any) { flash('Error saving.'); }
+      await fetchLocations().then(setLocations);
+    } catch (e: any) {
+      const msg = e?.response?.data?.error
+        ?? e?.response?.data?.message
+        ?? (typeof e?.response?.data === 'string' ? e.response.data : null)
+        ?? e?.message
+        ?? 'Error saving.';
+      flash(msg);
+      console.error('submitLoc error:', e?.response ?? e);
+    }
     setLoading(false);
   };
 
@@ -135,17 +146,18 @@ export default function AdminPage() {
     setLoading(true); setUploadProgress(0);
     try {
       const fd = new FormData();
-      Object.entries(catForm).forEach(([k, v]) => { 
-        if (k === 'pendingImages') (v as File[]).forEach(f => fd.append('images', f));
-        else if (v != null) fd.append(k, v as any); 
-      });
+      const { name, slug, description, pendingImages } = catForm;
+      if (name)        fd.append('name', name);
+      if (slug)        fd.append('slug', slug);
+      if (description !== undefined) fd.append('description', description);
+      (pendingImages as File[] ?? []).forEach(f => fd.append('images', f));
       editingCat !== null
         ? await adminUpdateCategory(editingCat, fd, token, setUploadProgress)
         : await adminCreateCategory(fd, token, setUploadProgress);
       flash('Success');
       setCatForm({ pendingImages: [] }); setEditingCat(null);
-      fetchCategories().then(setCategories);
-    } catch (e: any) { flash('Error saving.'); }
+      await fetchCategories().then(setCategories);
+    } catch (e: any) { flash(e?.response?.data?.error ?? 'Error saving.'); }
     setLoading(false);
   };
 
@@ -164,16 +176,18 @@ export default function AdminPage() {
       if (facts)        fd.append('facts', facts);
       if (duration)     fd.append('duration', duration);
       if (audioFile)    fd.append('audio', audioFile);
-      if (videoFile)    fd.append('video', videoFile);
-      else if (videoUrl) fd.append('videoUrl', videoUrl);
+      if (videoFile) {
+        const url = await directUploadToCloudinary(videoFile, token, 'smart-tourism/videos', setUploadProgress);
+        fd.append('videoUrl', url);
+      } else if (videoUrl !== undefined) fd.append('videoUrl', videoUrl);
       if (imageFiles)   Array.from(imageFiles as FileList).forEach(f => fd.append('images', f as File));
       editingItem !== null
-        ? await adminUpdateItem(editingItem, fd, token, setUploadProgress)
-        : await adminCreateItem(fd, token, setUploadProgress);
+        ? await adminUpdateItem(editingItem, fd, token)
+        : await adminCreateItem(fd, token);
       flash('Success');
       setItemForm({}); setEditingItem(null);
-      fetchItems({ limit: 200 }).then(r => setItems(r.data));
-    } catch (e: any) { flash('Error saving.'); }
+      await fetchItems({ limit: 200 }).then(r => setItems(r.data));
+    } catch (e: any) { flash(e?.response?.data?.error ?? 'Error saving.'); }
     setLoading(false);
   };
 
@@ -193,8 +207,8 @@ export default function AdminPage() {
       editingObj !== null ? await updateObject(editingObj, fd, token) : await createObject(fd, token);
       flash('Success');
       setObjForm({}); setEditingObj(null);
-      fetchObjects(1, 200).then(r => setObjects(r.data));
-    } catch (e: any) { flash('Error saving.'); }
+      await fetchObjects(1, 200).then(r => setObjects(r.data));
+    } catch (e: any) { flash(e?.response?.data?.error ?? 'Error saving.'); }
     setLoading(false);
   };
 
@@ -522,7 +536,7 @@ export default function AdminPage() {
               {tab === 'locations' && locations.map(loc => (
                 <div key={loc.id} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-6 group hover:shadow-modern transition-all">
                   <div className="w-24 h-24 rounded-[28px] overflow-hidden flex-shrink-0">
-                    <img src={loc.coverImage || 'https://picsum.photos/400/400?destination'} alt={loc.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                    <img src={loc.coverImage ? `${loc.coverImage}?t=${loc.id}` : 'https://picsum.photos/400/400?destination'} alt={loc.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                   </div>
                   <div className="flex-1 space-y-1">
                     <h4 className="font-headings font-bold text-lg text-slate-900">{loc.name}</h4>
@@ -568,14 +582,14 @@ export default function AdminPage() {
               {tab === 'items' && items.map(item => (
                 <div key={item.id} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-6 group hover:shadow-modern transition-all">
                   <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0">
-                    <img src={item.media[0]?.url || 'https://picsum.photos/200/200?item'} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                    <img src={item.media[0]?.url ? `${item.media[0].url}?t=${item.media[0].id}` : 'https://picsum.photos/200/200?item'} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                   </div>
                   <div className="flex-1 space-y-1">
                     <h4 className="font-headings font-bold text-lg text-slate-900">{item.name}</h4>
                     <p className="text-gray-400 text-sm line-clamp-1">{item.location.name} · {item.category.name}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setEditingItem(item.id); setItemForm(item); window.scrollTo({ top: 104, behavior: 'smooth' }); }} className="p-3 bg-gray-50 hover:bg-primary text-slate-400 hover:text-slate-900 rounded-2xl transition-all"><HiOutlinePencil size={20} /></button>
+                    <button onClick={() => { setEditingItem(item.id); setItemForm({ name: item.name, description: item.description, locationId: String(item.location.id), categoryId: String(item.category.id), habitat: item.habitat ?? '', conservation: item.conservation ?? '', facts: item.facts ?? '', duration: item.duration ?? '', videoUrl: item.videoUrl ?? '' }); window.scrollTo({ top: 104, behavior: 'smooth' }); }} className="p-3 bg-gray-50 hover:bg-primary text-slate-400 hover:text-slate-900 rounded-2xl transition-all"><HiOutlinePencil size={20} /></button>
                     <button onClick={async () => { if(confirm('Delete?')) await adminDeleteItem(item.id, token); fetchItems({limit: 200}).then(r => setItems(r.data)); }} className="p-3 bg-gray-50 hover:bg-accent text-slate-400 hover:text-white rounded-2xl transition-all"><HiOutlineTrash size={20} /></button>
                   </div>
                 </div>

@@ -60,11 +60,13 @@ export const adminLogin = (username: string, password: string): Promise<{ token:
 export const createObject = (formData: FormData, token: string): Promise<TourObject> =>
   axios.post(`${API}/objects`, formData, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
   }).then(r => r.data);
 
 export const updateObject = (id: number, formData: FormData, token: string): Promise<TourObject> =>
   axios.put(`${API}/objects/${id}`, formData, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
   }).then(r => r.data);
 
 export const deleteObject = (id: number, token: string): Promise<void> =>
